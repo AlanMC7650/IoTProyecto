@@ -190,18 +190,26 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
             <p className="muted">Generá una corrida para ver el gráfico.</p>
           ) : (
             <>
-              <ConvergenciaChart
-                filas={filas}
-                labelCalculado={config.labelCalculado}
-                labelReal={config.labelReal}
-              />
-              <h4>Error absoluto por iteración</h4>
-              <ErrorChart filas={filas} />
+              <div className="chart-block">
+                <h4 className="chart-title">Convergencia</h4>
+                <p className="chart-subtitle">Valor calculado frente al valor real</p>
+                <ConvergenciaChart
+                  filas={filas}
+                  labelCalculado={config.labelCalculado}
+                  labelReal={config.labelReal}
+                />
+              </div>
+              <div className="chart-block">
+                <h4 className="chart-title">Error absoluto por iteración</h4>
+                <p className="chart-subtitle">Mientras menor sea el error, mayor es la aproximación</p>
+                <ErrorChart filas={filas} />
+              </div>
               {tipo === "fibonacci" && (
-                <>
-                  <h4>Crecimiento de F(n) (escala logarítmica)</h4>
+                <div className="chart-block">
+                  <h4 className="chart-title">Crecimiento de F(n)</h4>
+                  <p className="chart-subtitle">Visualización en escala logarítmica</p>
                   <CrecimientoChart filas={filas} />
-                </>
+                </div>
               )}
             </>
           )}
