@@ -1,4 +1,5 @@
 import {
+  Brush,
   CartesianGrid,
   ComposedChart,
   Legend,
@@ -11,6 +12,8 @@ import {
 import type { FilaSerie } from "../../types/api";
 import {
   AXIS_COLOR,
+  BRUSH_FILL,
+  BRUSH_STROKE,
   COLOR_CALCULADO,
   COLOR_ERROR_ACCENT,
   COLOR_REAL,
@@ -43,7 +46,7 @@ export function ComparacionChart({ filas, labelCalculado, labelReal }: Props) {
   });
 
   return (
-    <ResponsiveContainer width="100%" height={300}>
+    <ResponsiveContainer width="100%" height={330}>
       <ComposedChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
         <CartesianGrid stroke={GRID_COLOR} vertical={false} />
         <XAxis
@@ -106,6 +109,13 @@ export function ComparacionChart({ filas, labelCalculado, labelReal }: Props) {
           strokeWidth={2}
           dot={false}
           isAnimationActive={false}
+        />
+        <Brush
+          dataKey="iteracion"
+          height={24}
+          stroke={BRUSH_STROKE}
+          fill={BRUSH_FILL}
+          travellerWidth={8}
         />
       </ComposedChart>
     </ResponsiveContainer>

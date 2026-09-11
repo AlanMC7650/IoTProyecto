@@ -1,4 +1,5 @@
 import {
+  Brush,
   CartesianGrid,
   Legend,
   Line,
@@ -9,7 +10,15 @@ import {
   YAxis,
 } from "recharts";
 import type { FilaSerie } from "../../types/api";
-import { AXIS_COLOR, COLOR_CALCULADO, COLOR_REAL, GRID_COLOR, TEXT_MUTED } from "./palette";
+import {
+  AXIS_COLOR,
+  BRUSH_FILL,
+  BRUSH_STROKE,
+  COLOR_CALCULADO,
+  COLOR_REAL,
+  GRID_COLOR,
+  TEXT_MUTED,
+} from "./palette";
 
 interface Props {
   filas: FilaSerie[];
@@ -25,7 +34,7 @@ export function ConvergenciaChart({ filas, labelCalculado, labelReal }: Props) {
   }));
 
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <ResponsiveContainer width="100%" height={310}>
       <LineChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
         <CartesianGrid stroke={GRID_COLOR} vertical={false} />
         <XAxis
@@ -62,6 +71,13 @@ export function ConvergenciaChart({ filas, labelCalculado, labelReal }: Props) {
           strokeDasharray="5 4"
           dot={false}
           isAnimationActive={false}
+        />
+        <Brush
+          dataKey="iteracion"
+          height={24}
+          stroke={BRUSH_STROKE}
+          fill={BRUSH_FILL}
+          travellerWidth={8}
         />
       </LineChart>
     </ResponsiveContainer>

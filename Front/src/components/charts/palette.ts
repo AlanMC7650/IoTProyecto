@@ -7,3 +7,6 @@ export const COLOR_CRECIMIENTO = "#48CAE4";
 export const GRID_COLOR = "#E7ECEB";
 export const AXIS_COLOR = "#D7E0DE";
 export const TEXT_MUTED = "#8D99AE";
+
+export const BRUSH_STROKE = "#B7C4C1";
+export const BRUSH_FILL = "#F4F8F7";

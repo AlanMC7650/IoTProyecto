@@ -52,6 +52,7 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
   const [ejecuciones, setEjecuciones] = useState<EjecucionResumen[]>([]);
   const [ejecucionActual, setEjecucionActual] = useState<string | null>(null);
   const [filas, setFilas] = useState<FilaSerie[]>([]);
+  const [filasFibonacci, setFilasFibonacci] = useState<FilaSerie[]>([]);
 
   const [iteraciones, setIteraciones] = useState("");
   const [funcion, setFuncion] = useState<FuncionTaylor | "">("");
@@ -66,6 +67,7 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
     setEjecuciones([]);
     setEjecucionActual(null);
     setFilas([]);
+    setFilasFibonacci([]);
     setError(null);
     setCargandoHistorial(true);
 
@@ -76,8 +78,19 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
       })
       .catch((err) => setError(mensajeError(err, "No se pudo cargar el historial")))
       .finally(() => setCargandoHistorial(false));
+
+    if (tipo === "fibonacci") cargarTodasFibonacci();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipo]);
+
+  async function cargarTodasFibonacci() {
+    try {
+      const data = await SeriesApi.listarMias("fibonacci");
+      setFilasFibonacci(data);
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo cargar las iteraciones de Fibonacci"));
+    }
+  }
 
   async function seleccionarEjecucion(id_ejecucion: string) {
     setEjecucionActual(id_ejecucion);
@@ -109,6 +122,7 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
         x_valor: resultado.x !== undefined ? String(resultado.x) : undefined,
       };
       setEjecuciones((prev) => [nueva, ...prev]);
+      if (tipo === "fibonacci") await cargarTodasFibonacci();
     } catch (err) {
       setError(mensajeError(err, "No se pudo generar la serie"));
     } finally {
@@ -133,6 +147,10 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
           setEjecucionActual(null);
           setFilas([]);
         }
+      }
+
+      if (tipo === "fibonacci") {
+        setFilasFibonacci((prev) => prev.filter((f) => f.id_ejecucion !== id_ejecucion));
       }
     } catch (err) {
       setError(mensajeError(err, "No se pudo eliminar la ejecución"));
@@ -262,14 +280,16 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
                 <p className="chart-subtitle">Mientras menor sea el error, mayor es la aproximación</p>
                 <ErrorChart filas={filas} />
               </div>
-              {tipo === "fibonacci" && (
-                <div className="chart-block">
-                  <h4 className="chart-title">Crecimiento de F(n)</h4>
-                  <p className="chart-subtitle">Visualización en escala logarítmica</p>
-                  <CrecimientoChart filas={filas} />
-                </div>
-              )}
             </>
+          )}
+          {tipo === "fibonacci" && filasFibonacci.length > 0 && (
+            <div className="chart-block">
+              <h4 className="chart-title">Crecimiento de F(n) (todas las ejecuciones)</h4>
+              <p className="chart-subtitle">
+                Todas las iteraciones generadas (eje X: id_fibonacci)
+              </p>
+              <CrecimientoChart filas={filasFibonacci} />
+            </div>
           )}
         </div>
       </div>
