@@ -6,7 +6,10 @@ import type { EjecucionResumen, FilaSerie, FuncionTaylor, TipoSerie } from "../t
 import { ConvergenciaChart } from "./charts/ConvergenciaChart";
 import { ErrorChart } from "./charts/ErrorChart";
 import { CrecimientoChart } from "./charts/CrecimientoChart";
+import { HistorialCompletoChart } from "./charts/HistorialCompletoChart";
 import { ComparacionChart } from "./charts/ComparacionChart";
+import { ComparacionEscalableChart } from "./charts/ComparacionEscalableChart";
+import { TodasLasSeriesChart } from "./charts/TodasLasSeriesChart";
 import { exportarEjecucion } from "../utils/exportSerie";
 import type { FormatoExport } from "../utils/exportSerie";
 
@@ -52,6 +55,7 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
   const [ejecuciones, setEjecuciones] = useState<EjecucionResumen[]>([]);
   const [ejecucionActual, setEjecucionActual] = useState<string | null>(null);
   const [filas, setFilas] = useState<FilaSerie[]>([]);
+  const [historialFibonacci, setHistorialFibonacci] = useState<FilaSerie[]>([]);
 
   const [iteraciones, setIteraciones] = useState("");
   const [funcion, setFuncion] = useState<FuncionTaylor | "">("");
@@ -76,6 +80,14 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
       })
       .catch((err) => setError(mensajeError(err, "No se pudo cargar el historial")))
       .finally(() => setCargandoHistorial(false));
+
+    if (tipo === "fibonacci") {
+      SeriesApi.listarMias("fibonacci")
+        .then(setHistorialFibonacci)
+        .catch(() => setHistorialFibonacci([]));
+    } else {
+      setHistorialFibonacci([]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tipo]);
 
@@ -109,6 +121,9 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
         x_valor: resultado.x !== undefined ? String(resultado.x) : undefined,
       };
       setEjecuciones((prev) => [nueva, ...prev]);
+      if (tipo === "fibonacci") {
+        setHistorialFibonacci((prev) => [...prev, ...resultado.filas]);
+      }
     } catch (err) {
       setError(mensajeError(err, "No se pudo generar la serie"));
     } finally {
@@ -125,6 +140,9 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
       await SeriesApi.eliminarEjecucion(tipo, id_ejecucion);
       const restantes = ejecuciones.filter((ej) => ej.id_ejecucion !== id_ejecucion);
       setEjecuciones(restantes);
+      if (tipo === "fibonacci") {
+        setHistorialFibonacci((prev) => prev.filter((f) => f.id_ejecucion !== id_ejecucion));
+      }
 
       if (id_ejecucion === ejecucionActual) {
         if (restantes.length > 0) {
@@ -177,10 +195,12 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
               </select>
             </label>
             <label>
-              x
+              x (entre -2 y 2)
               <input
                 type="number"
                 step="any"
+                min={-2}
+                max={2}
                 placeholder="aleatorio"
                 value={x}
                 onChange={(e) => setX(e.target.value)}
@@ -258,6 +278,17 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
                 />
               </div>
               <div className="chart-block">
+                <h4 className="chart-title">Comparación escalable</h4>
+                <p className="chart-subtitle">
+                  {config.labelCalculado} vs. {config.labelReal} (líneas, con escala lineal/log/exponencial)
+                </p>
+                <ComparacionEscalableChart
+                  filas={filas}
+                  labelCalculado={config.labelCalculado}
+                  labelReal={config.labelReal}
+                />
+              </div>
+              <div className="chart-block">
                 <h4 className="chart-title">Error absoluto por iteración</h4>
                 <p className="chart-subtitle">Mientras menor sea el error, mayor es la aproximación</p>
                 <ErrorChart filas={filas} />
@@ -269,6 +300,29 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
                   <CrecimientoChart filas={filas} />
                 </div>
               )}
+              {tipo === "fibonacci" && (
+                <div className="chart-block">
+                  <h4 className="chart-title">Historial completo (todas las ejecuciones)</h4>
+                  <p className="chart-subtitle">
+                    fibonacci_n de todas tus ejecuciones, una atrás de la otra (escala log)
+                    {historialFibonacci.length > 300 ? " — muestra de 300 puntos" : ""}
+                  </p>
+                  <HistorialCompletoChart filas={historialFibonacci} />
+                </div>
+              )}
+              <div className="chart-block">
+                <h4 className="chart-title">Todas las series juntas</h4>
+                <p className="chart-subtitle">
+                  {config.labelCalculado}, {config.labelReal}, error absoluto
+                  {tipo === "fibonacci" ? " y fibonacci_n" : ""} en un mismo gráfico (escala log)
+                </p>
+                <TodasLasSeriesChart
+                  filas={filas}
+                  tipo={tipo}
+                  labelCalculado={config.labelCalculado}
+                  labelReal={config.labelReal}
+                />
+              </div>
             </>
           )}
         </div>

@@ -50,13 +50,14 @@ export function ComparacionChart({ filas, labelCalculado, labelReal }: Props) {
           dataKey="iteracion"
           stroke={AXIS_COLOR}
           tick={{ fill: TEXT_MUTED, fontSize: 12 }}
-          label={{ value: "Iteración", position: "insideBottom", offset: -2, fill: TEXT_MUTED, fontSize: 12 }}
+          label={{ value: "ID de la serie", position: "insideBottom", offset: -2, fill: TEXT_MUTED, fontSize: 12 }}
         />
         <YAxis
           yAxisId="valor"
           stroke={AXIS_COLOR}
           tick={{ fill: TEXT_MUTED, fontSize: 12 }}
           width={70}
+          label={{ value: "Valor de la serie", angle: -90, position: "insideLeft", fill: TEXT_MUTED, fontSize: 12 }}
         />
         <YAxis
           yAxisId="error"

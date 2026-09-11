@@ -1,7 +1,7 @@
 import {
+  Bar,
+  BarChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -24,13 +24,13 @@ export function CrecimientoChart({ filas }: Props) {
 
   return (
     <ResponsiveContainer width="100%" height={220}>
-      <LineChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
+      <BarChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
         <CartesianGrid stroke={GRID_COLOR} vertical={false} />
         <XAxis
           dataKey="iteracion"
           stroke={AXIS_COLOR}
           tick={{ fill: TEXT_MUTED, fontSize: 12 }}
-          label={{ value: "Iteración", position: "insideBottom", offset: -2, fill: TEXT_MUTED, fontSize: 12 }}
+          label={{ value: "ID de la serie", position: "insideBottom", offset: -2, fill: TEXT_MUTED, fontSize: 12 }}
         />
         <YAxis
           scale="log"
@@ -39,18 +39,17 @@ export function CrecimientoChart({ filas }: Props) {
           stroke={AXIS_COLOR}
           tick={{ fill: TEXT_MUTED, fontSize: 12 }}
           width={70}
+          label={{ value: "Valor de la serie", angle: -90, position: "insideLeft", fill: TEXT_MUTED, fontSize: 12 }}
         />
         <Tooltip labelFormatter={(v) => `Iteración ${v}`} />
-        <Line
-          type="monotone"
+        <Bar
           dataKey="fibonacci_n"
           name="F(n) (escala log)"
-          stroke={COLOR_CRECIMIENTO}
-          strokeWidth={2}
-          dot={false}
+          fill={COLOR_CRECIMIENTO}
+          radius={[3, 3, 0, 0]}
           isAnimationActive={false}
         />
-      </LineChart>
+      </BarChart>
     </ResponsiveContainer>
   );
 }
