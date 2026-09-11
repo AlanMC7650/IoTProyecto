@@ -49,4 +49,8 @@ export const SeriesApi = {
     );
     return data.map(normalizarFila);
   },
+
+  async eliminarEjecucion(tipo: TipoSerie, id_ejecucion: string): Promise<void> {
+    await api.delete(`/series/${tipo}/ejecucion/${id_ejecucion}`);
+  },
 };

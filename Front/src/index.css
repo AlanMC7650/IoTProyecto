@@ -141,10 +141,18 @@ a:hover { text-decoration: underline; }
 .ejecuciones-list { padding: 15px; }
 .ejecuciones-list h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 12px; }
 .ejecuciones-list ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; max-height: 455px; overflow-y: auto; }
+.ejecuciones-list li { display: flex; align-items: stretch; gap: 4px; }
 .ejecuciones-list li button { width: 100%; text-align: left; padding: 10px; border: 1px solid transparent; background: #fff; color: var(--text-secondary); border-radius: 8px; font-size: 11px; line-height: 1.4; }
 .ejecuciones-list li button:hover { background: #f7fbfa; border-color: var(--border); }
 .ejecuciones-list li button.activa { background: var(--cyan-soft); color: var(--primary-dark); border-color: rgba(72,202,228,.25); font-weight: 700; }
+.ejecuciones-list li .eliminar-btn { flex: 0 0 28px; width: 28px; padding: 0; display: grid; place-items: center; color: var(--text-muted); font-size: 13px; }
+.ejecuciones-list li .eliminar-btn:hover { background: var(--danger-bg); color: var(--danger); border-color: rgba(198,40,40,.15); }
+.ejecuciones-list li .eliminar-btn:disabled { opacity: .5; cursor: default; }
 .serie-charts { padding: 20px; min-height: 280px; }
+.exportar-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 17px; }
+.exportar-bar span { font-size: 11px; color: var(--text-muted); }
+.exportar-bar button { border: 1px solid var(--border); background: #fff; color: var(--text-secondary); border-radius: 7px; padding: 5px 11px; font-size: 11px; font-weight: 700; }
+.exportar-bar button:hover { border-color: var(--primary); color: var(--primary); }
 .chart-block { padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 17px; }
 .chart-block:last-child { border-bottom: 0; margin-bottom: 0; }
 .chart-title { font-size: 13px; color: var(--text-secondary); margin: 0 0 5px; font-weight: 700; }

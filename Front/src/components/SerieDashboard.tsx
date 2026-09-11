@@ -6,6 +6,9 @@ import type { EjecucionResumen, FilaSerie, FuncionTaylor, TipoSerie } from "../t
 import { ConvergenciaChart } from "./charts/ConvergenciaChart";
 import { ErrorChart } from "./charts/ErrorChart";
 import { CrecimientoChart } from "./charts/CrecimientoChart";
+import { ComparacionChart } from "./charts/ComparacionChart";
+import { exportarEjecucion } from "../utils/exportSerie";
+import type { FormatoExport } from "../utils/exportSerie";
 
 interface Config {
   tipo: TipoSerie;
@@ -56,6 +59,7 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
 
   const [cargandoHistorial, setCargandoHistorial] = useState(true);
   const [generando, setGenerando] = useState(false);
+  const [eliminando, setEliminando] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -112,6 +116,36 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
     }
   }
 
+  async function onEliminar(id_ejecucion: string) {
+    if (!window.confirm("¿Eliminar esta ejecución? Esta acción no se puede deshacer.")) return;
+
+    setEliminando(id_ejecucion);
+    setError(null);
+    try {
+      await SeriesApi.eliminarEjecucion(tipo, id_ejecucion);
+      const restantes = ejecuciones.filter((ej) => ej.id_ejecucion !== id_ejecucion);
+      setEjecuciones(restantes);
+
+      if (id_ejecucion === ejecucionActual) {
+        if (restantes.length > 0) {
+          await seleccionarEjecucion(restantes[0].id_ejecucion);
+        } else {
+          setEjecucionActual(null);
+          setFilas([]);
+        }
+      }
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo eliminar la ejecución"));
+    } finally {
+      setEliminando(null);
+    }
+  }
+
+  function onExportar(formato: FormatoExport) {
+    if (!ejecucionActual) return;
+    exportarEjecucion(tipo, ejecucionActual, filas, formato);
+  }
+
   return (
     <section className="serie-dashboard">
       <header>
@@ -156,7 +190,7 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
         )}
 
         <button type="submit" disabled={generando}>
-          {generando ? "Generando..." : "Generar nueva corrida"}
+          {generando ? "Generando..." : "Generar nueva ejecución"}
         </button>
       </form>
 
@@ -164,10 +198,10 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
 
       <div className="serie-body">
         <aside className="ejecuciones-list">
-          <h3>Historial de corridas</h3>
+          <h3>Historial de ejecuciones</h3>
           {cargandoHistorial && <p>Cargando...</p>}
           {!cargandoHistorial && ejecuciones.length === 0 && (
-            <p className="muted">Todavía no generaste ninguna corrida.</p>
+            <p className="muted">Todavía no generaste ninguna ejecución.</p>
           )}
           <ul>
             {ejecuciones.map((ej) => (
@@ -180,6 +214,15 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
                   {ej.cantidad_iteraciones} iter.
                   {ej.funcion && ` · ${ej.funcion} x=${ej.x_valor}`}
                 </button>
+                <button
+                  className="eliminar-btn"
+                  aria-label="Eliminar ejecución"
+                  title="Eliminar ejecución"
+                  disabled={eliminando === ej.id_ejecucion}
+                  onClick={() => onEliminar(ej.id_ejecucion)}
+                >
+                  {eliminando === ej.id_ejecucion ? "…" : "✕"}
+                </button>
               </li>
             ))}
           </ul>
@@ -187,9 +230,24 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
 
         <div className="serie-charts">
           {filas.length === 0 ? (
-            <p className="muted">Generá una corrida para ver el gráfico.</p>
+            <p className="muted">Generá una ejecución para ver el gráfico.</p>
           ) : (
             <>
+              <div className="exportar-bar">
+                <span>Exportar ejecución:</span>
+                <button type="button" onClick={() => onExportar("csv")}>CSV</button>
+                <button type="button" onClick={() => onExportar("json")}>JSON</button>
+                <button type="button" onClick={() => onExportar("txt")}>TXT</button>
+              </div>
+              <div className="chart-block">
+                <h4 className="chart-title">Comparación completa</h4>
+                <p className="chart-subtitle">Serie y error absoluto juntos (eje derecho en escala log)</p>
+                <ComparacionChart
+                  filas={filas}
+                  labelCalculado={config.labelCalculado}
+                  labelReal={config.labelReal}
+                />
+              </div>
               <div className="chart-block">
                 <h4 className="chart-title">Convergencia</h4>
                 <p className="chart-subtitle">Valor calculado frente al valor real</p>
