@@ -10,5 +10,6 @@ router.post("/generar", FibonacciController.generar);
 router.get("/mias", FibonacciController.listarMias);
 router.get("/mias/ejecuciones", FibonacciController.listarEjecuciones);
 router.get("/ejecucion/:id_ejecucion", FibonacciController.listarPorEjecucion);
+router.delete("/ejecucion/:id_ejecucion", FibonacciController.eliminarEjecucion);
 
 export default router;

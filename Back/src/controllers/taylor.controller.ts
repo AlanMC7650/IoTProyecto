@@ -31,4 +31,12 @@ export const TaylorController = {
     );
     res.json(ejecuciones);
   },
+
+  async eliminarEjecucion(req: Request, res: Response) {
+    await TaylorService.eliminarEjecucion(
+      String(req.params.id_ejecucion),
+      req.cliente!.id_cliente
+    );
+    res.status(204).send();
+  },
 };

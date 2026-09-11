@@ -34,4 +34,8 @@ export const LeibnizRepository = {
       .orderBy("fecha_generacion", "DESC")
       .getRawMany();
   },
+
+  eliminarPorEjecucion(id_ejecucion: string, id_cliente: number) {
+    return repo.delete({ id_ejecucion, cliente: { id_cliente } });
+  },
 };

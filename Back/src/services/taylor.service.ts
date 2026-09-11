@@ -112,4 +112,14 @@ export const TaylorService = {
   listarEjecuciones(id_cliente: number) {
     return TaylorRepository.listarEjecucionesPorCliente(id_cliente);
   },
+
+  async eliminarEjecucion(id_ejecucion: string, id_cliente: number) {
+    const resultado = await TaylorRepository.eliminarPorEjecucion(
+      id_ejecucion,
+      id_cliente
+    );
+    if (!resultado.affected) {
+      throw new AppError("Ejecución no encontrada", 404);
+    }
+  },
 };

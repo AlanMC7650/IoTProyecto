@@ -67,4 +67,14 @@ export const LeibnizService = {
   listarEjecuciones(id_cliente: number) {
     return LeibnizRepository.listarEjecucionesPorCliente(id_cliente);
   },
+
+  async eliminarEjecucion(id_ejecucion: string, id_cliente: number) {
+    const resultado = await LeibnizRepository.eliminarPorEjecucion(
+      id_ejecucion,
+      id_cliente
+    );
+    if (!resultado.affected) {
+      throw new AppError("Ejecución no encontrada", 404);
+    }
+  },
 };

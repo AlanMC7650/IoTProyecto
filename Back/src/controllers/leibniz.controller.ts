@@ -31,4 +31,12 @@ export const LeibnizController = {
     );
     res.json(ejecuciones);
   },
+
+  async eliminarEjecucion(req: Request, res: Response) {
+    await LeibnizService.eliminarEjecucion(
+      String(req.params.id_ejecucion),
+      req.cliente!.id_cliente
+    );
+    res.status(204).send();
+  },
 };

@@ -69,4 +69,14 @@ export const FibonacciService = {
   listarEjecuciones(id_cliente: number) {
     return FibonacciRepository.listarEjecucionesPorCliente(id_cliente);
   },
+
+  async eliminarEjecucion(id_ejecucion: string, id_cliente: number) {
+    const resultado = await FibonacciRepository.eliminarPorEjecucion(
+      id_ejecucion,
+      id_cliente
+    );
+    if (!resultado.affected) {
+      throw new AppError("Ejecución no encontrada", 404);
+    }
+  },
 };
