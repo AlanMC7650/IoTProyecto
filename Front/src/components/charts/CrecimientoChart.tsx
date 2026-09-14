@@ -1,6 +1,7 @@
 import {
   Bar,
   BarChart,
+  Brush,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -8,46 +9,58 @@ import {
   YAxis,
 } from "recharts";
 import type { FilaSerie } from "../../types/api";
-import { AXIS_COLOR, COLOR_CRECIMIENTO, GRID_COLOR, TEXT_MUTED } from "./palette";
+import {
+  AXIS_COLOR,
+  BRUSH_FILL,
+  BRUSH_STROKE,
+  COLOR_CRECIMIENTO,
+  GRID_COLOR,
+  TEXT_MUTED,
+} from "./palette";
 
 interface Props {
   filas: FilaSerie[];
 }
 
-// Fibonacci crudo crece exponencial: en escala lineal las primeras iteraciones
-// se aplastan contra el eje. Escala logarítmica es la que realmente muestra la forma.
+// Escala lineal: muestra el crecimiento exponencial real de Fibonacci
+// (las primeras iteraciones quedan chicas frente a las últimas, "hockey stick").
 export function CrecimientoChart({ filas }: Props) {
-  const data = filas.map((f) => ({
-    iteracion: f.iteracion,
-    fibonacci_n: Number(f.fibonacci_n ?? 0),
-  }));
+  const data = filas
+    .slice()
+    .sort((a, b) => (a.id_fibonacci ?? 0) - (b.id_fibonacci ?? 0))
+    .map((f) => ({
+      id_fibonacci: f.id_fibonacci ?? 0,
+      fibonacci_n: Number(f.fibonacci_n ?? 0),
+    }));
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={250}>
       <BarChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
         <CartesianGrid stroke={GRID_COLOR} vertical={false} />
         <XAxis
-          dataKey="iteracion"
+          dataKey="id_fibonacci"
           stroke={AXIS_COLOR}
           tick={{ fill: TEXT_MUTED, fontSize: 12 }}
-          label={{ value: "ID de la serie", position: "insideBottom", offset: -2, fill: TEXT_MUTED, fontSize: 12 }}
+          label={{ value: "id_fibonacci", position: "insideBottom", offset: -2, fill: TEXT_MUTED, fontSize: 12 }}
         />
         <YAxis
-          scale="log"
-          domain={["auto", "auto"]}
-          allowDataOverflow
           stroke={AXIS_COLOR}
           tick={{ fill: TEXT_MUTED, fontSize: 12 }}
           width={70}
-          label={{ value: "Valor de la serie", angle: -90, position: "insideLeft", fill: TEXT_MUTED, fontSize: 12 }}
         />
-        <Tooltip labelFormatter={(v) => `Iteración ${v}`} />
+        <Tooltip labelFormatter={(v) => `id_fibonacci ${v}`} />
         <Bar
           dataKey="fibonacci_n"
-          name="F(n) (escala log)"
+          name="F(n)"
           fill={COLOR_CRECIMIENTO}
-          radius={[3, 3, 0, 0]}
           isAnimationActive={false}
+        />
+        <Brush
+          dataKey="id_fibonacci"
+          height={24}
+          stroke={BRUSH_STROKE}
+          fill={BRUSH_FILL}
+          travellerWidth={8}
         />
       </BarChart>
     </ResponsiveContainer>

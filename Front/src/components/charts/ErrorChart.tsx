@@ -1,4 +1,5 @@
 import {
+  Brush,
   CartesianGrid,
   Line,
   LineChart,
@@ -8,7 +9,7 @@ import {
   YAxis,
 } from "recharts";
 import type { FilaSerie } from "../../types/api";
-import { AXIS_COLOR, COLOR_ERROR, GRID_COLOR, TEXT_MUTED } from "./palette";
+import { AXIS_COLOR, BRUSH_FILL, BRUSH_STROKE, COLOR_ERROR, GRID_COLOR, TEXT_MUTED } from "./palette";
 
 interface Props {
   filas: FilaSerie[];
@@ -32,14 +33,14 @@ export function ErrorChart({ filas }: Props) {
   });
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={250}>
       <LineChart data={data} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
         <CartesianGrid stroke={GRID_COLOR} vertical={false} />
         <XAxis
           dataKey="iteracion"
           stroke={AXIS_COLOR}
           tick={{ fill: TEXT_MUTED, fontSize: 12 }}
-          label={{ value: "ID de la serie", position: "insideBottom", offset: -2, fill: TEXT_MUTED, fontSize: 12 }}
+          label={{ value: "Iteración", position: "insideBottom", offset: -2, fill: TEXT_MUTED, fontSize: 12 }}
         />
         <YAxis
           scale="log"
@@ -48,7 +49,6 @@ export function ErrorChart({ filas }: Props) {
           stroke={AXIS_COLOR}
           tick={{ fill: TEXT_MUTED, fontSize: 12 }}
           width={70}
-          label={{ value: "Error absoluto", angle: -90, position: "insideLeft", fill: TEXT_MUTED, fontSize: 12 }}
         />
         <Tooltip
           formatter={(_value, _name, props) => Number(props.payload.errorReal).toExponential(4)}
@@ -62,6 +62,13 @@ export function ErrorChart({ filas }: Props) {
           strokeWidth={2}
           dot={false}
           isAnimationActive={false}
+        />
+        <Brush
+          dataKey="iteracion"
+          height={24}
+          stroke={BRUSH_STROKE}
+          fill={BRUSH_FILL}
+          travellerWidth={8}
         />
       </LineChart>
     </ResponsiveContainer>

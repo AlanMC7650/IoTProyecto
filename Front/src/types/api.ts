@@ -42,6 +42,9 @@ export interface FilaSerie {
   error: string;
   fecha_generacion: string;
   id_ejecucion: string;
+  id_fibonacci?: number;
+  id_leibniz?: number;
+  id_taylor?: number;
   fibonacci_n?: string;
   funcion?: FuncionTaylor;
   x_valor?: string;
