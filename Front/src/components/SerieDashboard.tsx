@@ -289,19 +289,21 @@ export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
               return (
                 <div className="chart-block" key={valor}>
                   <h4 className="chart-title">
-                    Convergencia de Taylor — {label} (todas las ejecuciones)
+                    Comparación completa — {label} (todas las iteraciones)
                   </h4>
                   {filasFuncion.length === 0 ? (
                     <p className="muted">Todavía no generaste ejecuciones de {label.toLowerCase()}.</p>
                   ) : (
                     <>
                       <p className="chart-subtitle">
-                        Todas las iteraciones generadas para {label.toLowerCase()} (eje X: id_taylor)
+                        Todas las iteraciones de {label.toLowerCase()}: suma parcial, valor real y error absoluto (eje X: id_taylor, error en eje derecho log)
                       </p>
                       <ConvergenciaGlobalChart
                         filas={filasFuncion}
                         labelCalculado={config.labelCalculado}
+                        labelReal={config.labelReal}
                         idKey="id_taylor"
+                        mostrarError
                       />
                     </>
                   )}
