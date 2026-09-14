@@ -57,6 +57,9 @@ export const TaylorService = {
     if (typeof x !== "number" || !Number.isFinite(x)) {
       throw new AppError("x debe ser un número finito", 400);
     }
+    if (x < X_MIN || x > X_MAX) {
+      throw new AppError(`x debe estar entre ${X_MIN} y ${X_MAX}`, 400);
+    }
 
     const N = data.iteraciones ?? randomInt(MIN_ITERACIONES, MAX_ITERACIONES);
     if (!Number.isInteger(N) || N < 1 || N > LIMITE_ITERACIONES) {
