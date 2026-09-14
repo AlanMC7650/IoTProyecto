@@ -1,0 +1,350 @@
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
+import { SeriesApi } from "../services/series.service";
+import { mensajeError } from "../services/errors";
+import type { EjecucionResumen, FilaSerie, FuncionTaylor, TipoSerie } from "../types/api";
+import { ConvergenciaChart } from "./charts/ConvergenciaChart";
+import { ErrorChart } from "./charts/ErrorChart";
+import { CrecimientoChart } from "./charts/CrecimientoChart";
+import { ConvergenciaGlobalChart } from "./charts/ConvergenciaGlobalChart";
+import { ComparacionChart } from "./charts/ComparacionChart";
+import { exportarEjecucion } from "../utils/exportSerie";
+import type { FormatoExport } from "../utils/exportSerie";
+
+interface Config {
+  tipo: TipoSerie;
+  titulo: string;
+  descripcion: string;
+  labelCalculado: string;
+  labelReal: string;
+  soportaFuncionYX: boolean;
+}
+
+const CONFIGS: Record<TipoSerie, Config> = {
+  leibniz: {
+    tipo: "leibniz",
+    titulo: "Serie de Leibniz",
+    descripcion: "Aproximación de π por sumas parciales alternadas.",
+    labelCalculado: "π aproximado",
+    labelReal: "π real",
+    soportaFuncionYX: false,
+  },
+  fibonacci: {
+    tipo: "fibonacci",
+    titulo: "Serie de Fibonacci",
+    descripcion: "Razón F(n)/F(n-1) convergiendo al número áureo (φ).",
+    labelCalculado: "F(n)/F(n-1)",
+    labelReal: "φ (áureo)",
+    soportaFuncionYX: false,
+  },
+  taylor: {
+    tipo: "taylor",
+    titulo: "Serie de Taylor",
+    descripcion: "Expansión en serie de exponencial, seno o coseno.",
+    labelCalculado: "Suma parcial",
+    labelReal: "Valor real",
+    soportaFuncionYX: true,
+  },
+};
+
+// Series que muestran, además del gráfico por ejecución, un gráfico con
+// todas las iteraciones de todas las ejecuciones juntas.
+const TIPOS_CON_VISTA_GLOBAL: TipoSerie[] = ["fibonacci", "leibniz", "taylor"];
+
+// Taylor mezcla 3 funciones con formas muy distintas (exponencial crece,
+// seno/coseno oscilan): se separan en un gráfico global por función.
+const FUNCIONES_TAYLOR: { valor: FuncionTaylor; label: string }[] = [
+  { valor: "exponencial", label: "Exponencial" },
+  { valor: "seno", label: "Seno" },
+  { valor: "coseno", label: "Coseno" },
+];
+
+export function SerieDashboard({ tipo }: { tipo: TipoSerie }) {
+  const config = CONFIGS[tipo];
+  const tieneVistaGlobal = TIPOS_CON_VISTA_GLOBAL.includes(tipo);
+
+  const [ejecuciones, setEjecuciones] = useState<EjecucionResumen[]>([]);
+  const [ejecucionActual, setEjecucionActual] = useState<string | null>(null);
+  const [filas, setFilas] = useState<FilaSerie[]>([]);
+  const [filasTodas, setFilasTodas] = useState<FilaSerie[]>([]);
+
+  const [iteraciones, setIteraciones] = useState("");
+  const [funcion, setFuncion] = useState<FuncionTaylor | "">("");
+  const [x, setX] = useState("");
+
+  const [cargandoHistorial, setCargandoHistorial] = useState(true);
+  const [generando, setGenerando] = useState(false);
+  const [eliminando, setEliminando] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setEjecuciones([]);
+    setEjecucionActual(null);
+    setFilas([]);
+    setFilasTodas([]);
+    setError(null);
+    setCargandoHistorial(true);
+
+    SeriesApi.listarEjecuciones(tipo)
+      .then((data) => {
+        setEjecuciones(data);
+        if (data.length > 0) seleccionarEjecucion(data[0].id_ejecucion);
+      })
+      .catch((err) => setError(mensajeError(err, "No se pudo cargar el historial")))
+      .finally(() => setCargandoHistorial(false));
+
+    if (TIPOS_CON_VISTA_GLOBAL.includes(tipo)) cargarTodas();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tipo]);
+
+  async function cargarTodas() {
+    try {
+      const data = await SeriesApi.listarMias(tipo);
+      setFilasTodas(data);
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo cargar todas las iteraciones"));
+    }
+  }
+
+  async function seleccionarEjecucion(id_ejecucion: string) {
+    setEjecucionActual(id_ejecucion);
+    try {
+      const data = await SeriesApi.listarPorEjecucion(tipo, id_ejecucion);
+      setFilas(data);
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo cargar la ejecución"));
+    }
+  }
+
+  async function onGenerar(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setGenerando(true);
+    try {
+      const resultado = await SeriesApi.generar(tipo, {
+        iteraciones: iteraciones ? Number(iteraciones) : undefined,
+        funcion: funcion || undefined,
+        x: x ? Number(x) : undefined,
+      });
+      setFilas(resultado.filas);
+      setEjecucionActual(resultado.id_ejecucion);
+      const nueva: EjecucionResumen = {
+        id_ejecucion: resultado.id_ejecucion,
+        fecha_generacion: new Date().toISOString(),
+        cantidad_iteraciones: String(resultado.iteraciones),
+        funcion: resultado.funcion,
+        x_valor: resultado.x !== undefined ? String(resultado.x) : undefined,
+      };
+      setEjecuciones((prev) => [nueva, ...prev]);
+      if (tieneVistaGlobal) await cargarTodas();
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo generar la serie"));
+    } finally {
+      setGenerando(false);
+    }
+  }
+
+  async function onEliminar(id_ejecucion: string) {
+    if (!window.confirm("¿Eliminar esta ejecución? Esta acción no se puede deshacer.")) return;
+
+    setEliminando(id_ejecucion);
+    setError(null);
+    try {
+      await SeriesApi.eliminarEjecucion(tipo, id_ejecucion);
+      const restantes = ejecuciones.filter((ej) => ej.id_ejecucion !== id_ejecucion);
+      setEjecuciones(restantes);
+
+      if (id_ejecucion === ejecucionActual) {
+        if (restantes.length > 0) {
+          await seleccionarEjecucion(restantes[0].id_ejecucion);
+        } else {
+          setEjecucionActual(null);
+          setFilas([]);
+        }
+      }
+
+      if (tieneVistaGlobal) {
+        setFilasTodas((prev) => prev.filter((f) => f.id_ejecucion !== id_ejecucion));
+      }
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo eliminar la ejecución"));
+    } finally {
+      setEliminando(null);
+    }
+  }
+
+  function onExportar(formato: FormatoExport) {
+    if (!ejecucionActual) return;
+    exportarEjecucion(tipo, ejecucionActual, filas, formato);
+  }
+
+  return (
+    <section className="serie-dashboard">
+      <header>
+        <h2>{config.titulo}</h2>
+        <p className="serie-descripcion">{config.descripcion}</p>
+      </header>
+
+      <form className="generar-form" onSubmit={onGenerar}>
+        <label>
+          Iteraciones
+          <input
+            type="number"
+            min={1}
+            placeholder="aleatorio"
+            value={iteraciones}
+            onChange={(e) => setIteraciones(e.target.value)}
+          />
+        </label>
+
+        {config.soportaFuncionYX && (
+          <>
+            <label>
+              Función
+              <select value={funcion} onChange={(e) => setFuncion(e.target.value as FuncionTaylor | "")}>
+                <option value="">aleatoria</option>
+                <option value="exponencial">exponencial</option>
+                <option value="seno">seno</option>
+                <option value="coseno">coseno</option>
+              </select>
+            </label>
+            <label>
+              x
+              <input
+                type="number"
+                step="any"
+                placeholder="aleatorio"
+                value={x}
+                onChange={(e) => setX(e.target.value)}
+              />
+            </label>
+          </>
+        )}
+
+        <button type="submit" disabled={generando}>
+          {generando ? "Generando..." : "Generar nueva ejecución"}
+        </button>
+      </form>
+
+      {error && <p className="auth-error">{error}</p>}
+
+      <div className="serie-body">
+        <aside className="ejecuciones-list">
+          <h3>Historial de ejecuciones</h3>
+          {cargandoHistorial && <p>Cargando...</p>}
+          {!cargandoHistorial && ejecuciones.length === 0 && (
+            <p className="muted">Todavía no generaste ninguna ejecución.</p>
+          )}
+          <ul>
+            {ejecuciones.map((ej) => (
+              <li key={ej.id_ejecucion}>
+                <button
+                  className={ej.id_ejecucion === ejecucionActual ? "activa" : ""}
+                  onClick={() => seleccionarEjecucion(ej.id_ejecucion)}
+                >
+                  {new Date(ej.fecha_generacion).toLocaleString()} ·{" "}
+                  {ej.cantidad_iteraciones} iter.
+                  {ej.funcion && ` · ${ej.funcion} x=${ej.x_valor}`}
+                </button>
+                <button
+                  className="eliminar-btn"
+                  aria-label="Eliminar ejecución"
+                  title="Eliminar ejecución"
+                  disabled={eliminando === ej.id_ejecucion}
+                  onClick={() => onEliminar(ej.id_ejecucion)}
+                >
+                  {eliminando === ej.id_ejecucion ? "…" : "✕"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </aside>
+
+        <div className="serie-charts">
+          {tipo === "fibonacci" && filasTodas.length > 0 && (
+            <div className="chart-block">
+              <h4 className="chart-title">Crecimiento de F(n) (todas las ejecuciones)</h4>
+              <p className="chart-subtitle">
+                Todas las iteraciones generadas (eje X: id_fibonacci)
+              </p>
+              <CrecimientoChart filas={filasTodas} />
+            </div>
+          )}
+          {tipo === "leibniz" && filasTodas.length > 0 && (
+            <div className="chart-block">
+              <h4 className="chart-title">Convergencia de π (todas las ejecuciones)</h4>
+              <p className="chart-subtitle">
+                Todas las iteraciones generadas (eje X: id_leibniz)
+              </p>
+              <ConvergenciaGlobalChart
+                filas={filasTodas}
+                labelCalculado={config.labelCalculado}
+                idKey="id_leibniz"
+              />
+            </div>
+          )}
+          {tipo === "taylor" &&
+            FUNCIONES_TAYLOR.map(({ valor, label }) => {
+              const filasFuncion = filasTodas.filter((f) => f.funcion === valor);
+              return (
+                <div className="chart-block" key={valor}>
+                  <h4 className="chart-title">
+                    Convergencia de Taylor — {label} (todas las ejecuciones)
+                  </h4>
+                  {filasFuncion.length === 0 ? (
+                    <p className="muted">Todavía no generaste ejecuciones de {label.toLowerCase()}.</p>
+                  ) : (
+                    <>
+                      <p className="chart-subtitle">
+                        Todas las iteraciones generadas para {label.toLowerCase()} (eje X: id_taylor)
+                      </p>
+                      <ConvergenciaGlobalChart
+                        filas={filasFuncion}
+                        labelCalculado={config.labelCalculado}
+                        idKey="id_taylor"
+                      />
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          {filas.length === 0 ? (
+            <p className="muted">Generá una ejecución para ver el gráfico.</p>
+          ) : (
+            <>
+              <div className="exportar-bar">
+                <span>Exportar ejecución:</span>
+                <button type="button" onClick={() => onExportar("csv")}>CSV</button>
+                <button type="button" onClick={() => onExportar("json")}>JSON</button>
+                <button type="button" onClick={() => onExportar("txt")}>TXT</button>
+              </div>
+              <div className="chart-block">
+                <h4 className="chart-title">Comparación completa</h4>
+                <p className="chart-subtitle">Serie y error absoluto juntos (eje derecho en escala log)</p>
+                <ComparacionChart
+                  filas={filas}
+                  labelCalculado={config.labelCalculado}
+                  labelReal={config.labelReal}
+                />
+              </div>
+              <div className="chart-block">
+                <h4 className="chart-title">Convergencia</h4>
+                <p className="chart-subtitle">Valor calculado frente al valor real</p>
+                <ConvergenciaChart
+                  filas={filas}
+                  labelCalculado={config.labelCalculado}
+                  labelReal={config.labelReal}
+                />
+              </div>
+              <div className="chart-block">
+                <h4 className="chart-title">Error absoluto por iteración</h4>
+                <p className="chart-subtitle">Mientras menor sea el error, mayor es la aproximación</p>
+                <ErrorChart filas={filas} />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
