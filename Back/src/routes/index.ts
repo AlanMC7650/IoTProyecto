@@ -1,16 +1,14 @@
 import { Router } from "express";
 import authRoutes from "./auth.routes";
 import clienteRoutes from "./cliente.routes";
-import leibnizRoutes from "./leibniz.routes";
-import fibonacciRoutes from "./fibonacci.routes";
-import taylorRoutes from "./taylor.routes";
+import dispositivoRoutes from "./dispositivo.routes";
+import lecturaRoutes from "./lectura.routes";
 
 const router = Router();
 
 router.use("/auth", authRoutes);
 router.use("/clientes", clienteRoutes);
-router.use("/series/leibniz", leibnizRoutes);
-router.use("/series/fibonacci", fibonacciRoutes);
-router.use("/series/taylor", taylorRoutes);
+router.use("/dispositivos", dispositivoRoutes);
+router.use("/lecturas", lecturaRoutes);
 
 export default router;

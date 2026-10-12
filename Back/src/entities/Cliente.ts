@@ -1,7 +1,5 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from "typeorm";
-import { SerieLeibniz } from "./SerieLeibniz";
-import { SerieFibonacci } from "./SerieFibonacci";
-import { SerieTaylor } from "./SerieTaylor";
+import { Dispositivo } from "./Dispositivo";
 
 @Entity("cliente")
 export class Cliente {
@@ -23,12 +21,6 @@ export class Cliente {
   @Column({ type: "timestamp", default: () => "NOW()" })
   fecha_registro!: Date;
 
-  @OneToMany(() => SerieLeibniz, (s) => s.cliente)
-  leibniz!: SerieLeibniz[];
-
-  @OneToMany(() => SerieFibonacci, (s) => s.cliente)
-  fibonacci!: SerieFibonacci[];
-
-  @OneToMany(() => SerieTaylor, (s) => s.cliente)
-  taylor!: SerieTaylor[];
+  @OneToMany(() => Dispositivo, (d) => d.cliente)
+  dispositivos!: Dispositivo[];
 }
