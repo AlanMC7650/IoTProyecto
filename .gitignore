@@ -4,3 +4,5 @@ dist-ssr/
 .env
 *.local
 *.log
+ngrok.yml
+ESP32/config.py
