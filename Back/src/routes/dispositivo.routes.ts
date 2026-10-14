@@ -7,11 +7,15 @@ const router = Router();
 
 router.use(authMiddleware);
 
-router.post("/", DispositivoController.crear);
+router.post("/vincular", DispositivoController.vincular);
 router.get("/", DispositivoController.listar);
 router.patch("/:id", DispositivoController.actualizar);
-router.post("/:id/regenerar-clave", DispositivoController.regenerarClave);
-router.delete("/:id", DispositivoController.eliminar);
+router.delete("/:id", DispositivoController.desvincular);
+
+router.get("/:id/estado", DispositivoController.estado);
+router.post("/:id/valvula", DispositivoController.cambiarValvula);
+router.get("/:id/eventos", DispositivoController.eventos);
+router.post("/:id/eventos/atender-fugas", DispositivoController.atenderFugas);
 
 router.get("/:id/ultima", LecturaController.ultima);
 router.get("/:id/lecturas", LecturaController.listar);

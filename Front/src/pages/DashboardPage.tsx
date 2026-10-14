@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { DispositivoDashboard } from "../components/DispositivoDashboard";
-import { AgregarDispositivo } from "../components/AgregarDispositivo";
+import { VincularDispositivo } from "../components/VincularDispositivo";
 import { DispositivosApi } from "../services/dispositivos.service";
 import { mensajeError } from "../services/errors";
-import type { Dispositivo, DispositivoCreado } from "../types/api";
+import type { Dispositivo } from "../types/api";
 
-// Cada cuánto se refresca la lista (para el punto de en línea / desconectado)
-const POLL_DISPOSITIVOS_MS = 5000;
+// Cada cuánto se refresca la lista (para el punto de en línea / desconectado).
+// Cada pedido pasa por ngrok (20 000 peticiones por mes en el plan gratuito),
+// así que es poco frecuente; el dispositivo abierto se actualiza en tiempo real.
+const POLL_DISPOSITIVOS_MS = 60_000;
 
 type Vista = number | "nuevo" | null;
 
@@ -24,6 +26,7 @@ export function DashboardPage() {
     let cancelado = false;
 
     async function cargar() {
+      if (document.visibilityState !== "visible") return;
       try {
         const data = await DispositivosApi.listar();
         if (cancelado) return;
@@ -39,9 +42,11 @@ export function DashboardPage() {
 
     cargar();
     const intervalo = setInterval(cargar, POLL_DISPOSITIVOS_MS);
+    document.addEventListener("visibilitychange", cargar);
     return () => {
       cancelado = true;
       clearInterval(intervalo);
+      document.removeEventListener("visibilitychange", cargar);
     };
   }, []);
 
@@ -50,8 +55,9 @@ export function DashboardPage() {
     navigate("/login", { replace: true });
   }
 
-  function onCreado({ dispositivo }: DispositivoCreado) {
+  function onVinculado(dispositivo: Dispositivo) {
     setDispositivos((prev) => [...prev, dispositivo]);
+    setVista(dispositivo.id_dispositivo);
   }
 
   function onActualizado(actualizado: Dispositivo) {
@@ -60,7 +66,7 @@ export function DashboardPage() {
     );
   }
 
-  function onEliminado(id_dispositivo: number) {
+  function onDesvinculado(id_dispositivo: number) {
     const restantes = dispositivos.filter((d) => d.id_dispositivo !== id_dispositivo);
     setDispositivos(restantes);
     setVista(restantes[0]?.id_dispositivo ?? null);
@@ -75,8 +81,8 @@ export function DashboardPage() {
         <div className="sidebar-brand">
           <div className="sidebar-logo">≈</div>
           <div>
-            <strong>FlowLab</strong>
-            <small>Monitor de caudal</small>
+            <strong>AquaControl</strong>
+            <small>Mide. Controla. Ahorra.</small>
           </div>
         </div>
 
@@ -99,6 +105,12 @@ export function DashboardPage() {
             <span className="sidebar-icon">+</span>
             <span>Agregar dispositivo</span>
           </button>
+          {cliente?.rol === "admin" && (
+            <Link to="/admin" className="sidebar-admin">
+              <span className="sidebar-icon">★</span>
+              <span>Usuarios (admin)</span>
+            </Link>
+          )}
         </nav>
 
         <div className="sidebar-footer">
@@ -106,7 +118,7 @@ export function DashboardPage() {
             <div className="avatar">{inicial}</div>
             <div>
               <strong>{cliente?.nombre ?? "Usuario"}</strong>
-              <small>Cuenta activa</small>
+              <small>{cliente?.rol === "admin" ? "Superadministrador" : "Cuenta activa"}</small>
             </div>
           </div>
           <button className="sidebar-logout" onClick={onLogout}>Cerrar sesión</button>
@@ -117,8 +129,8 @@ export function DashboardPage() {
         <header className="dashboard-topbar">
           <div>
             <div className="dashboard-kicker">Dashboard</div>
-            <h1>Monitor de caudal</h1>
-            <p>Seguí en vivo el caudal y el consumo de agua de tus sensores.</p>
+            <h1>Monitor de agua</h1>
+            <p>Caudal, sensor de agua, electroválvula y LED de cada dispositivo, en tiempo real.</p>
           </div>
           <div className="topbar-user">Hola, {cliente?.nombre ?? "Usuario"}</div>
         </header>
@@ -136,19 +148,20 @@ export function DashboardPage() {
           <button className={vista === "nuevo" ? "activa" : ""} onClick={() => setVista("nuevo")}>
             + &nbsp;Agregar
           </button>
+          {cliente?.rol === "admin" && <Link to="/admin" className="tab-admin">★ Usuarios</Link>}
         </nav>
 
         {error && <p className="auth-error">{error}</p>}
 
         <main>
           {vista === "nuevo" ? (
-            <AgregarDispositivo onCreado={onCreado} onVerDispositivo={setVista} />
+            <VincularDispositivo onVinculado={onVinculado} />
           ) : seleccionado ? (
             <DispositivoDashboard
               key={seleccionado.id_dispositivo}
               dispositivo={seleccionado}
               onActualizado={onActualizado}
-              onEliminado={onEliminado}
+              onDesvinculado={onDesvinculado}
             />
           ) : cargando ? (
             <p className="muted">Cargando...</p>
@@ -157,11 +170,11 @@ export function DashboardPage() {
               <div className="estado-vacio-icono">≈</div>
               <h2>Todavía no tenés dispositivos</h2>
               <p>
-                Registrá tu primer ESP32 con caudalímetro: te damos una clave API para pegar en su{" "}
-                <code>config.py</code> y las lecturas empiezan a aparecer acá.
+                Encendé tu ESP32, conectalo a tu Wi-Fi y escribí acá el código de 6 caracteres que muestra.
+                No hace falta copiar ninguna clave al dispositivo.
               </p>
               <button type="button" className="btn-primary" onClick={() => setVista("nuevo")}>
-                Registrar mi primer dispositivo
+                Vincular mi primer dispositivo
               </button>
             </div>
           )}

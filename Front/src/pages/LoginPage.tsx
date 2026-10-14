@@ -24,7 +24,7 @@ export function LoginPage() {
       <form className="auth-card" onSubmit={onSubmit}>
         <div className="auth-brand">
           <div className="auth-logo">≈</div>
-          <h1>FlowLab</h1>
+          <h1>AquaControl</h1>
           <p className="auth-subtitle">Iniciá sesión para continuar al dashboard</p>
         </div>
         <label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus placeholder="tu@email.com" /></label>

@@ -20,6 +20,10 @@ export const ClienteRepository = {
     return repo.findOne({ where: { email } });
   },
 
+  actualizar(id_cliente: number, data: Partial<Cliente>) {
+    return repo.update({ id_cliente }, data);
+  },
+
   buscarPorEmailConPassword(email: string) {
     return repo
       .createQueryBuilder("cliente")

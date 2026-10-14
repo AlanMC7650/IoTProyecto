@@ -1,6 +1,8 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from "typeorm";
 import { Dispositivo } from "./Dispositivo";
 
+export type Rol = "usuario" | "admin";
+
 @Entity("cliente")
 export class Cliente {
   @PrimaryGeneratedColumn()
@@ -17,6 +19,12 @@ export class Cliente {
 
   @Column({ length: 255, select: false })
   password_hash!: string;
+
+  @Column({ type: "varchar", length: 10, default: "usuario" })
+  rol!: Rol;
+
+  @Column({ default: true })
+  activo!: boolean;
 
   @Column({ type: "timestamp", default: () => "NOW()" })
   fecha_registro!: Date;

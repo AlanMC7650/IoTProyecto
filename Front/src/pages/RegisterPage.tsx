@@ -27,7 +27,7 @@ export function RegisterPage() {
         <div className="auth-brand">
           <div className="auth-logo">≈</div>
           <h1>Crear cuenta</h1>
-          <p className="auth-subtitle">Registrate para usar FlowLab</p>
+          <p className="auth-subtitle">Registrate para usar AquaControl</p>
         </div>
         <label>Nombre<input value={nombre} onChange={(e) => setNombre(e.target.value)} required autoFocus placeholder="Tu nombre" /></label>
         <label>Identificador<input value={identificador} onChange={(e) => setIdentificador(e.target.value)} required placeholder="ej: legajo o cédula" /></label>

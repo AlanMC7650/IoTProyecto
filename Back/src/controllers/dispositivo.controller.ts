@@ -2,12 +2,12 @@ import { Request, Response } from "express";
 import { DispositivoService } from "../services/dispositivo.service";
 
 export const DispositivoController = {
-  async crear(req: Request, res: Response) {
-    const resultado = await DispositivoService.crear(
+  async vincular(req: Request, res: Response) {
+    const dispositivo = await DispositivoService.vincular(
       req.cliente!.id_cliente,
       req.body
     );
-    res.status(201).json(resultado);
+    res.status(201).json(dispositivo);
   },
 
   async listar(req: Request, res: Response) {
@@ -26,16 +26,42 @@ export const DispositivoController = {
     res.json(dispositivo);
   },
 
-  async regenerarClave(req: Request, res: Response) {
-    const resultado = await DispositivoService.regenerarClave(
+  async cambiarValvula(req: Request, res: Response) {
+    const estado = await DispositivoService.cambiarValvula(
+      Number(req.params.id),
+      req.cliente!.id_cliente,
+      req.body
+    );
+    res.json(estado);
+  },
+
+  async estado(req: Request, res: Response) {
+    const estado = await DispositivoService.estado(
       Number(req.params.id),
       req.cliente!.id_cliente
     );
-    res.json(resultado);
+    res.json(estado);
   },
 
-  async eliminar(req: Request, res: Response) {
-    await DispositivoService.eliminar(
+  async eventos(req: Request, res: Response) {
+    const eventos = await DispositivoService.eventos(
+      Number(req.params.id),
+      req.cliente!.id_cliente,
+      req.query.limite as string | undefined
+    );
+    res.json(eventos);
+  },
+
+  async atenderFugas(req: Request, res: Response) {
+    const estado = await DispositivoService.atenderFugas(
+      Number(req.params.id),
+      req.cliente!.id_cliente
+    );
+    res.json(estado);
+  },
+
+  async desvincular(req: Request, res: Response) {
+    await DispositivoService.desvincular(
       Number(req.params.id),
       req.cliente!.id_cliente
     );

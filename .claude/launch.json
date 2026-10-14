@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "aquacontrol-back",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "Back", "run", "dev"],
+      "port": 3000
+    }
+  ]
+}

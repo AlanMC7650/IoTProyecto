@@ -1,0 +1,239 @@
+{
+  "version": 1,
+  "author": "AquaControl - Maldonado, Claros, Lecoña",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-devkit-c-v4",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {
+        "env": "micropython-20231227-v1.22.0"
+      }
+    },
+    {
+      "type": "wokwi-relay-module",
+      "id": "rele",
+      "top": -124.6,
+      "left": 249.6,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_valv",
+      "top": -158.4,
+      "left": 465.6,
+      "rotate": 90,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led_valv",
+      "top": -102,
+      "left": 520,
+      "attrs": {
+        "color": "blue",
+        "label": "Electrovalvula"
+      }
+    },
+    {
+      "type": "wokwi-rgb-led",
+      "id": "rgb",
+      "top": 62.4,
+      "left": 336,
+      "attrs": {
+        "common": "cathode"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_r",
+      "top": 129.6,
+      "left": 220.8,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_g",
+      "top": 158.4,
+      "left": 220.8,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r_b",
+      "top": 187.2,
+      "left": 220.8,
+      "attrs": {
+        "value": "220"
+      }
+    },
+    {
+      "type": "wokwi-potentiometer",
+      "id": "pot_fuga",
+      "top": 267.5,
+      "left": -153.8,
+      "attrs": {
+        "label": "T1592 (agua)"
+      }
+    },
+    {
+      "type": "wokwi-slide-potentiometer",
+      "id": "pot_caudal",
+      "top": 340,
+      "left": 120,
+      "attrs": {
+        "travelLength": "30",
+        "label": "Caudal (simula YF-S201)"
+      }
+    }
+  ],
+  "connections": [
+    [
+      "esp:TX",
+      "$serialMonitor:RX",
+      "",
+      []
+    ],
+    [
+      "esp:RX",
+      "$serialMonitor:TX",
+      "",
+      []
+    ],
+    [
+      "rele:VCC",
+      "esp:5V",
+      "red",
+      []
+    ],
+    [
+      "rele:GND",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "rele:IN",
+      "esp:26",
+      "orange",
+      []
+    ],
+    [
+      "rele:COM",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "rele:NO",
+      "r_valv:1",
+      "green",
+      []
+    ],
+    [
+      "r_valv:2",
+      "led_valv:A",
+      "green",
+      []
+    ],
+    [
+      "led_valv:C",
+      "esp:GND.3",
+      "black",
+      []
+    ],
+    [
+      "esp:25",
+      "r_r:1",
+      "red",
+      []
+    ],
+    [
+      "esp:33",
+      "r_g:1",
+      "green",
+      []
+    ],
+    [
+      "esp:32",
+      "r_b:1",
+      "blue",
+      []
+    ],
+    [
+      "r_r:2",
+      "rgb:R",
+      "red",
+      []
+    ],
+    [
+      "r_g:2",
+      "rgb:G",
+      "green",
+      []
+    ],
+    [
+      "r_b:2",
+      "rgb:B",
+      "blue",
+      []
+    ],
+    [
+      "rgb:COM",
+      "esp:GND.3",
+      "black",
+      []
+    ],
+    [
+      "pot_fuga:SIG",
+      "esp:34",
+      "violet",
+      []
+    ],
+    [
+      "pot_fuga:VCC",
+      "esp:13",
+      "red",
+      []
+    ],
+    [
+      "pot_fuga:GND",
+      "esp:GND.1",
+      "black",
+      []
+    ],
+    [
+      "pot_caudal:SIG",
+      "esp:35",
+      "gold",
+      []
+    ],
+    [
+      "pot_caudal:VCC",
+      "esp:3V3",
+      "red",
+      []
+    ],
+    [
+      "pot_caudal:GND",
+      "esp:GND.2",
+      "black",
+      []
+    ],
+    [
+      "esp:4",
+      "esp:27",
+      "gold",
+      []
+    ]
+  ],
+  "dependencies": {}
+}

@@ -211,3 +211,100 @@ code { background: rgba(43,45,66,.06); border-radius: 4px; padding: 1px 5px; fon
 }
 
 .page-loading { padding: 40px; text-align: center; color: var(--text-muted); }
+
+/* Paneles de los cuatro componentes */
+.paneles { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 15px; margin-bottom: 17px; }
+.panel-componente { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 17px 18px 10px; min-width: 0; display: flex; flex-direction: column; }
+.panel-componente header h3 { font-size: 15px; margin: 0 0 3px; display: flex; align-items: center; gap: 8px; }
+.panel-componente header p { color: var(--text-muted); font-size: 12px; margin: 0 0 12px; }
+.etiqueta-actuador { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: #7B61C9; background: #F0ECFA; border-radius: 5px; padding: 2px 6px; }
+.panel-indicadores { display: flex; align-items: center; gap: 18px; min-height: 92px; flex-wrap: wrap; }
+.panel-detalle { display: block; font-size: 11px; color: var(--text-muted); margin: 6px 0 0; min-height: 15px; }
+.panel-grafica { margin-top: auto; padding-top: 6px; min-height: 200px; display: flex; flex-direction: column; justify-content: center; }
+.panel-grafica > .muted { font-size: 12px; text-align: center; margin: 0; }
+.valor-grande { font-size: 38px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.valor-grande small { font-size: 13px; color: var(--text-muted); font-weight: 600; letter-spacing: 0; }
+.panel-limite { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-secondary); }
+.barra { height: 8px; background: #E5E9F0; border-radius: 5px; overflow: hidden; }
+.barra > div { height: 100%; border-radius: 5px; transition: width .4s ease; }
+.btn-link { border: 0; background: none; color: var(--primary); font-size: 12px; font-weight: 700; padding: 0; text-align: left; }
+.btn-link:hover { text-decoration: underline; }
+.limite-form { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.limite-form input { width: 170px; min-height: 32px; border: 1px solid var(--border-strong); border-radius: 7px; padding: 4px 8px; font-size: 12px; }
+.limite-form button[type="submit"] { border: 0; border-radius: 7px; background: var(--primary); color: #fff; padding: 6px 12px; font-size: 12px; font-weight: 700; }
+.estado-texto { font-size: 20px; font-weight: 800; letter-spacing: -.01em; }
+
+/* Medidor semicircular del sensor de agua */
+.medidor { position: relative; width: 130px; height: 72px; overflow: hidden; display: flex; align-items: flex-end; justify-content: center; }
+.medidor-arco { position: absolute; inset: 0 0 auto 0; height: 130px; border-radius: 50%;
+  background: conic-gradient(from -90deg, var(--color) calc(var(--pct) * 1.8deg), #E5E9F0 0 180deg, transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 46px, #000 47px); mask: radial-gradient(circle, transparent 46px, #000 47px); }
+.medidor-umbral { position: absolute; bottom: 0; left: calc(50% - 1px); width: 2px; height: 65px; transform-origin: bottom center; background: linear-gradient(#E63946 0 20px, transparent 20px); }
+.medidor strong { position: relative; font-size: 18px; margin-bottom: 4px; }
+.alerta-fuga { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--danger); background: var(--danger-bg); border-radius: 8px; padding: 8px 10px; }
+.alerta-fuga button { align-self: flex-start; border: 0; border-radius: 7px; background: var(--danger); color: #fff; padding: 6px 12px; font-size: 12px; font-weight: 700; }
+
+/* Electroválvula */
+.pastilla { min-width: 128px; text-align: center; padding: 14px 18px; border-radius: 999px; font-weight: 800; letter-spacing: .04em; background: #E5E9F0; color: var(--text-muted); }
+.pastilla.abierta { background: #2CA02C; color: #fff; box-shadow: 0 4px 12px rgba(44,160,44,.25); }
+.pastilla.cerrada { background: #E63946; color: #fff; box-shadow: 0 4px 12px rgba(230,57,70,.25); }
+.valvula-info { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 180px; }
+.valvula-info .panel-detalle { margin: 0; font-size: 12px; color: var(--text-secondary); }
+.botones-modo { display: flex; gap: 6px; flex-wrap: wrap; }
+.botones-modo button { border: 1px solid var(--border-strong); background: #fff; color: var(--text-secondary); border-radius: 8px; padding: 7px 13px; font-size: 12px; font-weight: 700; }
+.botones-modo button:hover { border-color: #7B61C9; color: #7B61C9; }
+.botones-modo button.activa { background: #7B61C9; border-color: #7B61C9; color: #fff; }
+
+/* LED RGB virtual (gemelo digital) */
+.led-virtual { width: 74px; height: 74px; border-radius: 50%; flex: 0 0 74px; position: relative;
+  background: radial-gradient(circle at 35% 35%, rgba(255,255,255,.65), transparent 45%), var(--color);
+  opacity: calc(.25 + var(--brillo) * .75);
+  box-shadow: 0 0 calc(var(--brillo) * 22px) calc(var(--brillo) * 4px) var(--color); transition: all .6s ease; margin: 6px; }
+.led-virtual.parpadea { animation: parpadeo 1.2s ease-in-out infinite; }
+.led-virtual.fuga { animation: fuga 0.6s steps(1) infinite; }
+@keyframes parpadeo { 50% { opacity: .2; box-shadow: none; } }
+@keyframes fuga { 50% { --color: #E63946; background: #E63946; box-shadow: 0 0 30px 8px #E63946; } }
+.leyenda-led { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; font-size: 11px; color: var(--text-muted); }
+.leyenda-led span { display: inline-flex; align-items: center; gap: 4px; }
+.leyenda-led i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+/* Eventos */
+.eventos h3 { font-size: 14px; margin-bottom: 10px; }
+.eventos ul { list-style: none; margin: 0; padding: 0; }
+.eventos li { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; align-items: center; font-size: 12px; padding: 8px 0; border-top: 1px solid var(--border); }
+.eventos li:first-child { border-top: 0; }
+.evento-tipo { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; border-radius: 5px; padding: 3px 7px; text-align: center; background: #EEF1F5; color: var(--text-secondary); }
+.evento-tipo.fuga { background: var(--danger-bg); color: var(--danger); }
+.evento-tipo.limite { background: #FFF3E0; color: #B26A00; }
+.evento-tipo.flujo_continuo { background: #E3F2FD; color: #1565C0; }
+.evento-tipo.valvula { background: #F0ECFA; color: #7B61C9; }
+
+/* Vinculación */
+.pasos-vinculacion { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 16px 16px 34px; margin: 0 0 17px; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+.pasos-vinculacion li + li { margin-top: 6px; }
+.input-codigo { font-family: ui-monospace, Consolas, monospace; letter-spacing: .25em; text-transform: uppercase; }
+
+/* Administración */
+.admin-shell { max-width: 1180px; margin: 0 auto; padding: 28px 24px 55px; }
+.sidebar-admin { margin-top: 10px; border-radius: 9px; padding: 11px 12px; font-size: 13px; font-weight: 600; display: flex; gap: 10px; align-items: center; color: #7B61C9; background: #F6F3FD; }
+.sidebar-admin:hover { text-decoration: none; background: #ECE6FA; }
+.tab-admin { display: none; }
+.buscador { width: 100%; min-height: 40px; border: 1px solid var(--border-strong); border-radius: 9px; padding: 8px 12px; margin-bottom: 14px; }
+.tabla-scroll { overflow-x: auto; }
+.tabla-usuarios { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.tabla-usuarios th { text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); padding: 8px 10px; border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
+.tabla-usuarios td { padding: 9px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.tabla-usuarios tr.suspendido td { color: var(--text-muted); text-decoration: line-through; }
+.tabla-usuarios tr.suspendido td:last-child { text-decoration: none; }
+a.btn-secundario { display: inline-block; }
+
+@media (max-width: 900px) {
+  .sidebar-admin > span:not(.sidebar-icon) { display: none; }
+  .sidebar-admin { justify-content: center; padding: 11px 7px; }
+}
+@media (max-width: 700px) {
+  .paneles { grid-template-columns: 1fr; }
+  .tab-admin { display: inline-flex; align-items: center; border: 1px solid var(--border); background: #F6F3FD; color: #7B61C9; border-radius: 9px; padding: 9px 16px; font-size: 13px; }
+  .eventos li { grid-template-columns: 1fr; gap: 4px; }
+  .admin-shell { padding: 20px 14px 35px; }
+}

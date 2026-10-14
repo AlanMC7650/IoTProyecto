@@ -1,5 +1,7 @@
 # Cambios hechos: de las series simuladas al caudalímetro YF-S201
 
+> **Nota:** esta es la etapa anterior. Lo actual (Supabase, ngrok, vinculación automática, válvula, LED, sensor de agua y superadmin) está en [FASE2.md](FASE2.md).
+
 Este documento resume qué se cambió en el proyecto siguiendo [PLAN_CAUDALIMETRO.md](PLAN_CAUDALIMETRO.md) y cómo ejecutar todo.
 
 El trabajo está en la rama **`caudalimetro`** (sin subir a GitHub), con un commit por etapa.

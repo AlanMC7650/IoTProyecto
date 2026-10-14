@@ -1,45 +1,64 @@
-# ESP32 + caudalímetro YF-S201 (MicroPython)
+# ESP32 de AquaControl (MicroPython)
 
-El ESP32 cuenta los pulsos del sensor, calcula una lectura por segundo y las envía cada 5 s por WiFi al Back (`POST /api/lecturas`). Si se queda sin WiFi guarda hasta 600 lecturas (~10 min) y las manda cuando vuelve, con su hora correcta.
+El ESP32 mide el caudal (YF-S201) y el agua en el piso (T1592), maneja la electroválvula con un relé y el LED RGB, y cada 5 s envía una lectura **directo a Supabase**. No pasa por ngrok: el plan gratuito de ngrok permite 20 000 peticiones por mes y un ESP32 enviando cada 5 s haría ~518 000.
+
+No hay que escribir el Wi-Fi ni ninguna clave por dispositivo: el Wi-Fi se configura desde el celular y el dispositivo se vincula con un código de 6 caracteres.
 
 ## Cableado
 
-| Cable del YF-S201 | ESP32 |
+| Componente | Pin del componente | ESP32 |
+|---|---|---|
+| YF-S201 | Rojo / Negro / Amarillo | 5V (VIN) / GND / GPIO 27 (con divisor 10 kΩ – 20 kΩ: la señal es de 5 V) |
+| Sensor de agua T1592 | S / + / − | GPIO 34 / GPIO 13 / GND |
+| Módulo relé | VCC / GND / IN | 5V / GND / GPIO 26 |
+| Electroválvula NC 220 VAC | bobina | contacto COM–NO del relé (fase) y neutro |
+| LED RGB cátodo común | R / G / B / COM | GPIO 25 / 33 / 32 (220 Ω cada uno) / GND |
+
+El T1592 va en el piso, en el punto más bajo bajo la instalación, con las pistas hacia arriba. La parte de 220 VAC va en una caja aislada.
+
+## Subirlo con Thonny (una sola vez por ESP32)
+
+1. El ESP32 tiene que tener el firmware de MicroPython (Thonny: *Herramientas → Opciones → Intérprete → MicroPython (ESP32)*).
+2. Copiá `config.example.py` como `config.py` y completá `SUPABASE_URL` y `SUPABASE_ANON_KEY` (Supabase → Project Settings → API Keys). Es el mismo archivo para todos los dispositivos.
+3. Guardá en el ESP32 (*Archivo → Guardar como... → Dispositivo MicroPython*) los tres archivos: `config.py`, `portal.py` y `main.py`.
+4. Reiniciá el ESP32 (botón EN).
+
+## Configurar y vincular
+
+1. **Wi-Fi:** la primera vez el ESP32 crea la red `AquaControl-XXXXXX` y el LED parpadea en azul. Conectate con el celular, abrí `http://192.168.4.1`, elegí tu red (2,4 GHz) y escribí la contraseña. El ESP32 se reinicia.
+2. **Vincular:** con el LED azul parpadeando, entrá al dashboard → **Agregar dispositivo** y escribí el código (las 6 letras y números de `AquaControl-XXXXXX`; también aparece en la consola de Thonny) y un nombre.
+3. En unos segundos el ESP32 recibe su token, lo guarda en `token.json` y empieza a enviar lecturas.
+
+Para empezar de cero (otra red Wi-Fi u otro dueño): mantener el botón **BOOT** 5 segundos.
+
+## Cómo funciona
+
+| Situación | Qué hace el ESP32 |
 |---|---|
-| Rojo (VCC) | 5V (VIN) |
-| Negro (GND) | GND |
-| Amarillo (señal) | GPIO 27 |
-
-El sensor se alimenta con 5 V y su señal también sale a 5 V, pero los pines del ESP32 trabajan a 3.3 V. Se recomienda un **divisor resistivo** en el cable amarillo: 10 kΩ entre la señal y el GPIO 27, y 20 kΩ entre el GPIO 27 y GND.
-
-## Cómo subirlo con Thonny
-
-1. El ESP32 tiene que tener el firmware de MicroPython (en Thonny: *Herramientas → Opciones → Intérprete → MicroPython (ESP32)*).
-2. Copiá `config.example.py` como `config.py` y completá:
-   - `WIFI_SSID` y `WIFI_PASSWORD`: tu red (tiene que ser de **2.4 GHz**, el ESP32 no ve redes de 5 GHz).
-   - `SERVIDOR`: la URL "En la red" que imprime el Back al arrancar, por ejemplo `http://192.168.1.50:3000`.
-   - `API_KEY`: la clave que te muestra la web al registrar el dispositivo.
-3. En Thonny abrí `config.py` y `main.py` y guardá cada uno en el ESP32 con *Archivo → Guardar como... → Dispositivo MicroPython*, con esos mismos nombres.
-4. Reiniciá el ESP32 (botón EN o Ctrl+D en la consola). Como el archivo se llama `main.py`, arranca solo cada vez que se enciende.
+| Agua en el piso (T1592 > 1500 de 4095) | Cierra la válvula al instante, aunque no haya Internet. Se reabre cuando el usuario confirma la fuga en el dashboard y el piso está seco. |
+| Límite diario alcanzado (modo automático) | Cierra la válvula. Lleva la cuenta también sin Internet. Se reabre al día siguiente o si el usuario sube el límite. |
+| El usuario abre o cierra la válvula en el dashboard | La orden llega en la respuesta del próximo envío (menos de 5 s). |
+| Sin Wi-Fi | Sigue midiendo y controlando la válvula; guarda hasta 120 lecturas (~10 min) y las envía al volver, con su hora real. |
+| Lo desvinculan desde el dashboard | Borra su token y vuelve a mostrar el código. |
+| El programa se cuelga | El watchdog lo reinicia a los 30 s. La válvula NC queda cerrada mientras tanto. |
 
 ## Qué se ve en la consola
 
 ```
-Conectando a WiFi: mi_red
-Caudal_Lmin: 0.0 Volumen_L: 0.0
-WiFi conectado, IP: 192.168.1.73
-Caudal_Lmin: 2.13 Volumen_L: 0.036
-Envio OK: 5 lecturas, quedan 0 en cola
+AquaControl 24:6F:28:3F:2A:1B · código de vinculación: 3F2A1B
+Esperando vinculación. Código: 3F2A1B
+Vinculado como Cocina - empiezo a enviar lecturas
+Válvula ABIERTA
+Caudal 6.42 L/min · hoy 145.3 L · cola 0
 ```
-
-Las líneas `Caudal_Lmin: ... Volumen_L: ...` se pueden graficar con *Ver → Plotter* de Thonny.
 
 ## Si algo falla
 
 | Mensaje | Causa probable |
 |---|---|
-| `Sin WiFi, N lecturas en cola` | SSID o clave incorrectos, o la red es de 5 GHz. |
-| `Envio fallido (se reintenta): ...` | El ESP32 no llega a la PC: IP incorrecta en `SERVIDOR`, el Back no está corriendo, o el firewall de Windows bloquea el puerto 3000. |
-| `Envio rechazado, estado 401` | `API_KEY` incorrecta (o se regeneró la clave en la web). |
-| `Envio rechazado, estado 400` | El Back rechazó los datos; el mensaje dice qué campo. |
-| El caudal siempre da 0 | Revisar el cable amarillo y `PIN_SENSOR`. |
+| Vuelve a abrir el portal después de 30 s | La contraseña del Wi-Fi está mal o la red es de 5 GHz. |
+| `Sin conexión con Supabase` | El Wi-Fi no tiene Internet, o `SUPABASE_URL` está mal escrita. |
+| `Anuncio rechazado: 401` | `SUPABASE_ANON_KEY` está mal copiada. |
+| `Figura vinculado pero no tengo token` | Se borró `token.json` (por ejemplo, al regrabar el ESP32): desvincularlo en el dashboard y volver a vincularlo. |
+| El caudal siempre da 0 | Revisar el cable amarillo, el divisor y GPIO 27. |
+| El relé hace lo contrario | Poner `RELE_ACTIVO_EN_ALTO = False` en `config.py`. |

@@ -1,101 +1,165 @@
-// Simula un ESP32 con el caudalímetro YF-S201: genera una lectura falsa por
-// segundo y las envía en lote a POST /api/lecturas, igual que ESP32/main.py.
-// Sirve para probar el Back y el Front sin hardware.
+// Simula un ESP32 de AquaControl para probar sin hardware. Hace lo mismo que
+// ESP32/main.py: se anuncia en Supabase con su MAC, muestra el código para
+// vincularlo desde el dashboard y, una vez vinculado, envía cada 5 s una
+// lectura con el caudal, el sensor de agua, la válvula y el LED.
 //
 // Uso:
-//   npm run simular -- <API_KEY> [SERVIDOR]
-//   (o con variables de entorno API_KEY y SERVIDOR)
+//   npm run simular                    (MAC fija de prueba)
+//   npm run simular -- --fuga          (simula agua en el piso al minuto de empezar)
+//   npm run simular -- --mac 02:00:00:00:00:02
+//
+// Necesita en Back/.env:
+//   SUPABASE_ANON_KEY  clave pública del proyecto (Supabase -> Project Settings -> API Keys)
+//   SUPABASE_URL       opcional; si falta se arma con el id del proyecto que está en DB_USER
 
-const API_KEY = process.argv[2] ?? process.env.API_KEY;
-const SERVIDOR = (
-  process.argv[3] ??
-  process.env.SERVIDOR ??
-  "http://localhost:3000"
-).replace(/\/+$/, "");
+import "dotenv/config";
+import fs from "fs";
+import path from "path";
+
+const args = process.argv.slice(2);
+const posMac = args.indexOf("--mac");
+const MAC = (posMac >= 0 && args[posMac + 1] ? args[posMac + 1] : "02:00:00:00:00:01").toUpperCase();
+const SIMULAR_FUGA = args.includes("--fuga");
+
+const proyecto = process.env.DB_USER?.split(".")[1];
+const SUPABASE_URL = (process.env.SUPABASE_URL ?? (proyecto ? `https://${proyecto}.supabase.co` : "")).replace(/\/+$/, "");
+const ANON = process.env.SUPABASE_ANON_KEY;
 
 const FACTOR_K = 7.5;
 const PULSOS_POR_LITRO = 450;
-const INTERVALO_ENVIO_S = 5;
-const MAX_COLA = 600;
-const MAX_LOTE = 100;
+const INTERVALO_S = 5;
+const UMBRAL_FUGA = 1500;
+const ARCHIVO = path.join(__dirname, "..", ".simulador.json");
 
-interface LecturaEnCola {
-  t: number;
-  caudal_lmin: number;
-  volumen_l: number;
-  pulsos: number;
-}
-
-if (!API_KEY) {
-  console.error("Falta la clave API. Uso: npm run simular -- <API_KEY> [SERVIDOR]");
+if (!SUPABASE_URL || !ANON) {
+  console.error("Falta SUPABASE_ANON_KEY (y SUPABASE_URL si DB_USER no es de Supabase) en Back/.env");
   process.exit(1);
 }
 
-const cola: LecturaEnCola[] = [];
-let totalPulsos = 0;
-let segundos = 0;
-let enviando = false;
+// El token se guarda en un archivo, como el token.json del ESP32
+function leerToken(): string | null {
+  try {
+    const datos = JSON.parse(fs.readFileSync(ARCHIVO, "utf8"));
+    return datos[MAC] ?? null;
+  } catch {
+    return null;
+  }
+}
 
-// Caudal objetivo en L/min: canilla que se abre y se cierra, con algo de ruido
-function caudalSimulado(t: number): number {
+function guardarToken(token: string | null) {
+  let datos: Record<string, string> = {};
+  try { datos = JSON.parse(fs.readFileSync(ARCHIVO, "utf8")); } catch { /* primera vez */ }
+  if (token) datos[MAC] = token; else delete datos[MAC];
+  fs.writeFileSync(ARCHIVO, JSON.stringify(datos, null, 2));
+}
+
+async function rpc(funcion: string, cuerpo: unknown) {
+  const respuesta = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${funcion}`, {
+    method: "POST",
+    headers: { apikey: ANON!, "Content-Type": "application/json" },
+    body: JSON.stringify(cuerpo),
+  });
+  const texto = await respuesta.text();
+  return { ok: respuesta.ok, status: respuesta.status, datos: texto ? JSON.parse(texto) : null };
+}
+
+let token = leerToken();
+let segundos = 0;
+let totalPulsos = 0;
+let valvulaAbierta = false;
+let fugaLocal = false;
+let pulsosIntervalo = 0;
+let nivel = 0;
+
+// Caudal en L/min: una canilla que se abre y se cierra, con algo de ruido
+function caudalDeseado(t: number): number {
   const ciclo = t % 90;
   if (ciclo >= 60) return 0;
   const base = 6 + 3 * Math.sin((t / 20) * Math.PI);
   return Math.max(0, base + (Math.random() - 0.5) * 0.8);
 }
 
-function medir() {
-  segundos++;
-  const pulsos = Math.round(caudalSimulado(segundos) * FACTOR_K);
-  totalPulsos += pulsos;
-
-  const caudal_lmin = pulsos / FACTOR_K;
-  const volumen_l = totalPulsos / PULSOS_POR_LITRO;
-  cola.push({ t: Date.now(), caudal_lmin, volumen_l, pulsos });
-  if (cola.length > MAX_COLA) cola.splice(0, cola.length - MAX_COLA);
-
-  console.log(
-    "Caudal_Lmin:", caudal_lmin.toFixed(2),
-    "Volumen_L:", volumen_l.toFixed(3)
-  );
-
-  if (segundos % INTERVALO_ENVIO_S === 0) void enviar();
+function nivelAgua(t: number): number {
+  if (SIMULAR_FUGA && t >= 60 && t < 90) return 3000 + Math.round(Math.random() * 200);
+  return 150 + Math.round(Math.random() * 60);
 }
 
-async function enviar() {
-  if (enviando) return;
-  enviando = true;
-  try {
-    while (cola.length > 0) {
-      const lote = cola.slice(0, MAX_LOTE);
-      const ahora = Date.now();
-      const respuesta = await fetch(`${SERVIDOR}/api/lecturas`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": API_KEY! },
-        body: JSON.stringify({
-          lecturas: lote.map((l) => ({
-            caudal_lmin: Number(l.caudal_lmin.toFixed(3)),
-            volumen_l: Number(l.volumen_l.toFixed(3)),
-            pulsos: l.pulsos,
-            ms_atras: ahora - l.t,
-          })),
-        }),
-      });
+function led(caudal: number): { led_estado: string; led_brillo: number } {
+  if (!token) return { led_estado: "vinculando", led_brillo: 100 };
+  if (fugaLocal) return { led_estado: "fuga", led_brillo: 100 };
+  if (caudal < 0.1) return { led_estado: "apagado", led_brillo: 0 };
+  const brillo = Math.round(15 + 85 * Math.min(caudal / 8, 1));
+  return { led_estado: caudal > 8 ? "rojo" : caudal > 4 ? "amarillo" : "verde", led_brillo: brillo };
+}
 
-      if (respuesta.status !== 201) {
-        console.log(`Envío falló (${respuesta.status}): ${await respuesta.text()}`);
-        return;
+async function ciclo() {
+  segundos++;
+  // Con la válvula cerrada no pasa agua
+  const pulsos = valvulaAbierta ? Math.round(caudalDeseado(segundos) * FACTOR_K) : 0;
+  pulsosIntervalo += pulsos;
+  totalPulsos += pulsos;
+  nivel = nivelAgua(segundos);
+  if (nivel >= UMBRAL_FUGA && !fugaLocal) {
+    fugaLocal = true;
+    valvulaAbierta = false;
+    console.log("ALERTA: agua en el piso, se cierra la válvula");
+  }
+
+  if (segundos % INTERVALO_S !== 0) return;
+
+  try {
+    if (!token) {
+      const r = await rpc("anunciar_dispositivo", { p_mac: MAC });
+      if (!r.ok) return console.log(`Anuncio rechazado (${r.status}):`, r.datos?.message ?? r.datos);
+      if (r.datos.token) {
+        token = r.datos.token;
+        guardarToken(token);
+        console.log(`Vinculado como "${r.datos.nombre}". Empiezo a enviar lecturas.`);
+      } else if (r.datos.estado === "pendiente") {
+        console.log(`Esperando vinculación. Código: ${r.datos.codigo}  (Agregar dispositivo en el dashboard)`);
+      } else {
+        console.log("El dispositivo figura vinculado pero este simulador no tiene su token: desvinculalo desde el dashboard.");
       }
-      // Solo se saca de la cola lo que el servidor confirmó con 201
-      cola.splice(0, lote.length);
-      console.log(`Envío OK: ${lote.length} lecturas (quedan ${cola.length} en cola)`);
+      return;
     }
+
+    const caudal = pulsosIntervalo / INTERVALO_S / FACTOR_K;
+    const lectura = {
+      caudal_lmin: Number(caudal.toFixed(3)),
+      volumen_l: Number((totalPulsos / PULSOS_POR_LITRO).toFixed(3)),
+      pulsos: pulsosIntervalo,
+      nivel_agua: nivel,
+      fuga: fugaLocal,
+      valvula_abierta: valvulaAbierta,
+      ...led(caudal),
+      ms_atras: 0,
+    };
+    pulsosIntervalo = 0;
+
+    const r = await rpc("registrar_lecturas", { p_token: token, p_lecturas: [lectura] });
+    if (!r.ok) {
+      const mensaje = String(r.datos?.message ?? "");
+      console.log(`Envío rechazado (${r.status}): ${mensaje}`);
+      if (mensaje.includes("token")) {
+        token = null;
+        guardarToken(null);
+        console.log("Token inválido: vuelvo a anunciarme");
+      }
+      return;
+    }
+
+    const estado = r.datos;
+    // La fuga local se libera cuando el usuario la confirma en el dashboard y el piso está seco
+    if (fugaLocal && estado.fugas_pendientes === 0 && nivel < UMBRAL_FUGA) fugaLocal = false;
+    valvulaAbierta = !fugaLocal && estado.valvula === "abrir";
+    console.log(
+      `Envío OK · ${lectura.caudal_lmin} L/min · agua ${lectura.nivel_agua} · LED ${lectura.led_estado} ${lectura.led_brillo}% · ` +
+      `válvula ${valvulaAbierta ? "abierta" : `cerrada (${estado.motivo ?? "local"})`} · hoy ${estado.consumo_hoy_l} L`
+    );
   } catch (error) {
-    console.log(`Envío falló, se reintenta en el próximo ciclo (${cola.length} en cola):`, (error as Error).message);
-  } finally {
-    enviando = false;
+    console.log("Sin conexión con Supabase, se reintenta:", (error as Error).message);
   }
 }
 
-console.log(`Simulando ESP32 -> ${SERVIDOR}/api/lecturas (Ctrl+C para cortar)`);
-setInterval(medir, 1000);
+console.log(`Simulando ESP32 ${MAC} -> ${SUPABASE_URL} (Ctrl+C para cortar)`);
+setInterval(ciclo, 1000);

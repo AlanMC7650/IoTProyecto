@@ -1,66 +1,16 @@
 import { LecturaRepository } from "../repositories/lectura.repository";
-import { DispositivoRepository } from "../repositories/dispositivo.repository";
 import { DispositivoService } from "./dispositivo.service";
 import { AppError } from "../utils/AppError";
-import { Dispositivo } from "../entities/Dispositivo";
-import {
-  LecturaDTO,
-  RangoLecturasDTO,
-  RegistrarLecturasDTO,
-} from "../dtos/lectura.dto";
+import { RangoLecturasDTO } from "../dtos/lectura.dto";
 
-const MAX_LECTURAS_POR_ENVIO = 500;
-const MAX_MS_ATRAS = 24 * 60 * 60 * 1000;
+// Las lecturas las inserta la función registrar_lecturas de la BD, que el
+// ESP32 llama directo en Supabase. Este servicio solo las consulta.
+
 const RANGO_POR_DEFECTO_MS = 10 * 60 * 1000;
 const LIMITE_MAXIMO = 5000;
 const MAX_AGRUPAR_S = 24 * 60 * 60;
-// Topes de las columnas DECIMAL / INT de lectura_caudal
-const MAX_CAUDAL = 9_999_999;
-const MAX_VOLUMEN = 99_999_999_999;
-const MAX_PULSOS = 2_147_483_647;
-
-function esNumeroValido(valor: unknown, maximo: number): valor is number {
-  return (
-    typeof valor === "number" &&
-    Number.isFinite(valor) &&
-    valor >= 0 &&
-    valor <= maximo
-  );
-}
-
-function validarLectura(lectura: LecturaDTO, indice: number) {
-  const donde = `lecturas[${indice}]`;
-  if (typeof lectura !== "object" || lectura === null) {
-    throw new AppError(`${donde} debe ser un objeto`, 400);
-  }
-  if (!esNumeroValido(lectura.caudal_lmin, MAX_CAUDAL)) {
-    throw new AppError(
-      `${donde}.caudal_lmin debe ser un número finito y no negativo`,
-      400
-    );
-  }
-  if (!esNumeroValido(lectura.volumen_l, MAX_VOLUMEN)) {
-    throw new AppError(
-      `${donde}.volumen_l debe ser un número finito y no negativo`,
-      400
-    );
-  }
-  if (
-    !esNumeroValido(lectura.pulsos, MAX_PULSOS) ||
-    !Number.isInteger(lectura.pulsos)
-  ) {
-    throw new AppError(
-      `${donde}.pulsos debe ser un entero no negativo`,
-      400
-    );
-  }
-  if (!esNumeroValido(lectura.ms_atras, MAX_MS_ATRAS)) {
-    throw new AppError(
-      `${donde}.ms_atras debe ser un número entre 0 y ${MAX_MS_ATRAS} (24 h)`,
-      400
-    );
-  }
-}
+// El ESP32 envía una lectura cada 5 s: se usa para estimar el tiempo con la válvula cerrada
+const SEGUNDOS_POR_LECTURA = 5;
 
 function parsearFecha(valor: string | undefined, campo: string) {
   if (valor === undefined || valor === "") return undefined;
@@ -95,36 +45,11 @@ function parsearEntero(
   return numero;
 }
 
+function numeroONull(valor: string | null) {
+  return valor === null ? null : Number(valor);
+}
+
 export const LecturaService = {
-  async registrar(dispositivo: Dispositivo, data: RegistrarLecturasDTO) {
-    const lecturas = data?.lecturas;
-    if (
-      !Array.isArray(lecturas) ||
-      lecturas.length < 1 ||
-      lecturas.length > MAX_LECTURAS_POR_ENVIO
-    ) {
-      throw new AppError(
-        `lecturas debe ser un arreglo de 1 a ${MAX_LECTURAS_POR_ENVIO} elementos`,
-        400
-      );
-    }
-    lecturas.forEach(validarLectura);
-
-    const ahora = Date.now();
-    const { id_dispositivo } = dispositivo;
-    const filas = lecturas.map((l) => ({
-      dispositivo: { id_dispositivo },
-      caudal_lmin: l.caudal_lmin.toFixed(3),
-      volumen_l: l.volumen_l.toFixed(3),
-      pulsos: l.pulsos,
-      fecha_medicion: new Date(ahora - l.ms_atras),
-    }));
-
-    await LecturaRepository.guardarLote(filas);
-    await DispositivoRepository.marcarConexion(id_dispositivo);
-    return { guardadas: filas.length };
-  },
-
   async ultima(id_dispositivo: number, id_cliente: number) {
     await DispositivoService.obtenerPropio(id_dispositivo, id_cliente);
     return LecturaRepository.ultimaPorDispositivo(id_dispositivo);
@@ -162,6 +87,11 @@ export const LecturaService = {
       caudal_lmin: Number(f.caudal_lmin).toFixed(3),
       volumen_l: f.volumen_l,
       pulsos: Number(f.pulsos),
+      nivel_agua: f.nivel_agua === null ? null : Math.round(Number(f.nivel_agua)),
+      fuga: f.fuga,
+      valvula_abierta: f.valvula_abierta,
+      led_estado: f.led_estado,
+      led_brillo: f.led_brillo === null ? null : Math.round(Number(f.led_brillo)),
     }));
   },
 
@@ -185,6 +115,7 @@ export const LecturaService = {
     // el acumulado vuelve a 0 cada vez que el ESP32 se reinicia.
     const pulsos = Number(fila?.pulsos ?? 0);
     const litros = pulsos / Number(dispositivo.pulsos_por_litro);
+    const cerrada = Number(fila?.lecturas_valvula_cerrada ?? 0);
 
     return {
       desde,
@@ -193,6 +124,9 @@ export const LecturaService = {
       caudal_promedio: Number(Number(fila?.caudal_promedio ?? 0).toFixed(3)),
       caudal_maximo: Number(Number(fila?.caudal_maximo ?? 0).toFixed(3)),
       litros_consumidos: Number(litros.toFixed(3)),
+      nivel_agua_maximo: numeroONull(fila?.nivel_agua_maximo ?? null),
+      lecturas_con_fuga: Number(fila?.lecturas_con_fuga ?? 0),
+      minutos_valvula_cerrada: Math.round((cerrada * SEGUNDOS_POR_LECTURA) / 60),
     };
   },
 };

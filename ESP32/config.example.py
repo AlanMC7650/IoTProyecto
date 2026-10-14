@@ -1,11 +1,16 @@
-# Copiar este archivo como config.py y completar los datos.
-# config.py NO se sube al repo (está en .gitignore) porque tiene la clave del WiFi y la clave API.
+# Copiar este archivo como config.py y completar los dos datos del proyecto de Supabase.
+# Es el MISMO archivo para todos los ESP32: no lleva el Wi-Fi ni ninguna clave propia
+# del dispositivo (el Wi-Fi se configura desde el celular y el token llega solo).
+# config.py no se sube al repo (está en .gitignore).
 
-WIFI_SSID = "mi_red"
-WIFI_PASSWORD = "mi_clave"
-SERVIDOR = "http://192.168.1.50:3000"   # IP local de la PC que corre el Back
-API_KEY = "pegar_aqui_la_clave_del_dispositivo"
-PIN_SENSOR = 27
-FACTOR_K = 7.5
-PULSOS_POR_LITRO = 450
-INTERVALO_ENVIO_S = 5
+# Supabase -> Project Settings -> Data API (URL del proyecto)
+SUPABASE_URL = "https://xxxxxxxxxxxxxxxxxxxx.supabase.co"
+
+# Supabase -> Project Settings -> API Keys -> clave "anon" o "publishable".
+# Es pública por diseño: con RLS activado solo permite ejecutar las funciones
+# anunciar_dispositivo y registrar_lecturas.
+SUPABASE_ANON_KEY = "pegar_aqui_la_clave_publica"
+
+# Muchos módulos relé se activan con nivel bajo (LOW). Si el relé hace lo
+# contrario de lo esperado, cambiar a False.
+RELE_ACTIVO_EN_ALTO = True

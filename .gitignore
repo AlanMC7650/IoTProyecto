@@ -7,3 +7,4 @@ dist-ssr/
 ngrok.yml
 ESP32/config.py
 *.zip
+__pycache__/

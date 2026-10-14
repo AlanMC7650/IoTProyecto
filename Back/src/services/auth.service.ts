@@ -60,6 +60,7 @@ export const AuthService = {
     const token = firmarToken({
       id_cliente: cliente.id_cliente,
       identificador: cliente.identificador,
+      rol: cliente.rol,
     });
 
     return { cliente: sinPassword(cliente), token };
@@ -83,10 +84,14 @@ export const AuthService = {
     if (!passwordValida) {
       throw new AppError("Credenciales inválidas", 401);
     }
+    if (!cliente.activo) {
+      throw new AppError("Tu cuenta está suspendida. Contactá al administrador.", 403);
+    }
 
     const token = firmarToken({
       id_cliente: cliente.id_cliente,
       identificador: cliente.identificador,
+      rol: cliente.rol,
     });
 
     return { cliente: sinPassword(cliente), token };

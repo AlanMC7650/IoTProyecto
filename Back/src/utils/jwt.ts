@@ -1,8 +1,10 @@
 import jwt from "jsonwebtoken";
+import { Rol } from "../entities/Cliente";
 
 export interface TokenPayload {
   id_cliente: number;
   identificador: string;
+  rol: Rol;
 }
 
 const JWT_SECRET = process.env.JWT_SECRET as string;

@@ -8,6 +8,7 @@ import * as dotenv from "dotenv";
 import { AppDataSource } from "./config/data-source";
 import router from "./routes";
 import { errorHandler } from "./middlewares/errorHandler";
+import { RealtimeService } from "./services/realtime.service";
 
 dotenv.config();
 
@@ -42,14 +43,16 @@ function ipsLocales(): string[] {
 AppDataSource.initialize()
   .then(() => {
     console.log("Conexión a Postgres establecida");
+    RealtimeService.iniciar();
 
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
       console.log(`Servidor corriendo en puerto ${PORT}`);
       console.log(`  En esta PC:  http://localhost:${PORT}`);
       for (const ip of ipsLocales()) {
-        console.log(`  En la red:   http://${ip}:${PORT}   <- usar esta en SERVIDOR del config.py del ESP32`);
+        console.log(`  En la red:   http://${ip}:${PORT}`);
       }
+      console.log("  Desde Internet: `npm run tunnel` en otra terminal (ngrok)");
       if (!fs.existsSync(INDEX_HTML)) {
         console.log("Aviso: no existe Back/public, la web no se sirve desde acá (correr `npm run front`)");
       }
