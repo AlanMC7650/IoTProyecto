@@ -6,7 +6,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "simular": "ts-node --transpile-only scripts/simular-esp32.ts",
-    "front": "npm --prefix ../Front run build && node scripts/copiar-front.js"
+    "front": "npm --prefix ../Front run build && node scripts/copiar-front.js",
+    "tunnel": "ngrok start --config ngrok.yml backend"
   },
   "keywords": [],
   "author": "",

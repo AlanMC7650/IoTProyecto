@@ -6,3 +6,4 @@ dist-ssr/
 *.log
 ngrok.yml
 ESP32/config.py
+*.zip
