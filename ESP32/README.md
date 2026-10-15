@@ -1,6 +1,6 @@
 # ESP32 de AquaControl (MicroPython)
 
-El ESP32 mide el caudal (YF-S201) y el agua en el piso (T1592), maneja la electroválvula con un relé y el LED RGB, y cada 2 s envía una lectura **directo a Supabase**. No pasa por ngrok: el plan gratuito de ngrok permite 20 000 peticiones por mes y un ESP32 enviando cada 2 s haría ~1,3 millones.
+El ESP32 mide el caudal (YF-S201) y el agua en el piso (T1592), maneja la electroválvula con un relé y el LED RGB, arma una lectura cada 2 s y cada ~6 s las envía juntas **directo a Supabase**. No pasa por ngrok: el plan gratuito de ngrok permite 20 000 peticiones por mes y un ESP32 enviando cada 2 s haría ~1,3 millones.
 
 No hay que escribir el Wi-Fi ni ninguna clave por dispositivo: el Wi-Fi se configura desde el celular y el dispositivo se vincula con un código de 6 caracteres.
 
@@ -37,7 +37,7 @@ Para empezar de cero (otra red Wi-Fi u otro dueño): mantener el botón **BOOT**
 |---|---|
 | Agua en el piso (T1592 > 1500 de 4095) | Cierra la válvula al instante, aunque no haya Internet. Se reabre cuando el usuario confirma la fuga en el dashboard y el piso está seco. |
 | Límite diario alcanzado (modo automático) | Cierra la válvula. Lleva la cuenta también sin Internet. Se reabre al día siguiente o si el usuario sube el límite. |
-| El usuario abre o cierra la válvula en el dashboard | La orden llega en la respuesta del próximo envío (unos 2 s). |
+| El usuario abre o cierra la válvula en el dashboard | La orden llega en la respuesta del próximo envío (hasta ~6 s). |
 | Sin Wi-Fi | Sigue midiendo y controlando la válvula; guarda hasta 150 lecturas (~5 min) y las envía al volver, con su hora real. |
 | Lo desvinculan desde el dashboard | Borra su token y vuelve a mostrar el código. |
 | El programa se cuelga | El watchdog lo reinicia a los 30 s. La válvula NC queda cerrada mientras tanto. |

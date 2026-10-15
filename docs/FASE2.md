@@ -5,14 +5,14 @@ Qué cambió respecto al caudalímetro de la fase anterior y cómo levantar todo
 ## Arquitectura
 
 ```
-ESP32 ──HTTPS cada 2 s──> Supabase (PostgreSQL + funciones)
+ESP32 ──HTTPS cada ~6 s──> Supabase (PostgreSQL + funciones)
                               │  NOTIFY nueva_lectura
                               ▼
 Navegador <──ngrok──> Back (Node/Express en la PC) ──SQL──┘
               (REST + tiempo real por SSE)
 ```
 
-- **El ESP32 no pasa por ngrok.** El plan gratuito de ngrok permite 20 000 peticiones por mes y un ESP32 enviando cada 2 s haría alrededor de 1,3 millones. El ESP32 llama directo a dos funciones de Supabase (`anunciar_dispositivo` y `registrar_lecturas`), que no tienen límite de peticiones en el plan gratuito.
+- **El ESP32 no pasa por ngrok.** El plan gratuito de ngrok permite 20 000 peticiones por mes y un ESP32 enviando cada ~6 s haría unas 430 000. El ESP32 llama directo a dos funciones de Supabase (`anunciar_dispositivo` y `registrar_lecturas`), que no tienen límite de peticiones en el plan gratuito.
 - **ngrok solo publica el Back**, que sirve el dashboard y la API. El tiempo real usa Server-Sent Events: una sola petición por pestaña abierta.
 - Si la PC del Back está apagada, las lecturas igual se guardan en Supabase.
 
@@ -113,9 +113,16 @@ Se quitaron `POST /api/lecturas` (con `X-API-Key`), `POST /api/dispositivos` y `
 
 ### Velocidad y permisos del admin (segunda ronda)
 
-- **Envío cada 2 s (antes 5 s)** en el ESP32 y en el simulador. No se baja más porque cada envío abre una conexión HTTPS, que en el ESP32 tarda alrededor de 1 s. El dashboard marca "en línea" con menos de 10 s sin datos y actualiza ese estado cada segundo.
+- **Una lectura cada 2 s (antes 5 s)** en el ESP32 y en el simulador; ver más abajo cómo se envían. No se baja más porque cada envío abre una conexión HTTPS, que en el ESP32 tarda alrededor de 1 s. El dashboard marca "en línea" con menos de 10 s sin datos y actualiza ese estado cada segundo.
 - **Limpieza automática en la BD:** con una lectura cada 2 s se suman ~43 000 filas por día y por dispositivo. `registrar_lecturas` borra de vez en cuando (1 de cada 100 envíos) las lecturas de más de 30 días de ese dispositivo, para no llenar los 500 MB del plan gratuito.
 - **Superadmin con permiso de lectura sobre todos los dispositivos:** lecturas, resumen, estado, eventos, tiempo real y exportación. Las acciones que modifican (válvula, límite, configuración, confirmar fuga, desvincular) siguen siendo solo del dueño.
+
+### Tiempo real estable (tercera ronda, ver [ARREGLO_TIEMPO_REAL.md](ARREGLO_TIEMPO_REAL.md))
+
+- **El ESP32 mide cada 2 s y envía cada ~6 s:** antes cada lectura abría su propia conexión HTTPS, que en el ESP32 bloquea de 3 a 5 s, así que en la práctica salía una lectura cada ~8 s. Ahora arma una lectura cada 2 s (`INTERVALO_LECTURA_S`) y manda la cola en un solo POST cada 6 s (`INTERVALO_ENVIO_S`): un tercio de las conexiones.
+- **Un aviso por cada lectura del lote:** `registrar_lecturas` hace un `pg_notify('nueva_lectura', …)` por cada lectura insertada, en orden de medición, así el dashboard dibuja los 3 puntos del lote y no solo el último.
+- **"En línea" con 30 s** (antes 10 s) en el Back y el Front: un envío fallido no marca el dispositivo como desconectado.
+- **El Back revisa su escucha de la BD cada 30 s** y la reabre si se cortó en silencio (commit `3247261`).
 
 ## Qué se probó
 

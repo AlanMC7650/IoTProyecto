@@ -198,7 +198,7 @@ export function PanelValvula({
       </div>
       <p className="panel-detalle">
         {resumen ? `En el rango estuvo cerrada ${resumen.minutos_valvula_cerrada} min` : " "}
-        {esperandoEsp32 && ` · Orden enviada: ${estado?.valvula}. El ESP32 la aplica en su próximo envío (unos 2 s)`}
+        {esperandoEsp32 && ` · Orden enviada: ${estado?.valvula}. El ESP32 la aplica en su próximo envío (unos 6 s)`}
         {!enVivo && " · La orden llega al ESP32 cuando vuelva a conectarse"}
       </p>
       <Grafica puntos={puntos} sinDatos={sinDatos}>

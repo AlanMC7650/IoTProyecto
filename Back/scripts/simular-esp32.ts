@@ -1,7 +1,8 @@
 // Simula un ESP32 de AquaControl para probar sin hardware. Hace lo mismo que
 // ESP32/main.py: se anuncia en Supabase con su MAC, muestra el código para
-// vincularlo desde el dashboard y, una vez vinculado, envía cada 2 s una
-// lectura con el caudal, el sensor de agua, la válvula y el LED.
+// vincularlo desde el dashboard y, una vez vinculado, arma cada 2 s una
+// lectura con el caudal, el sensor de agua, la válvula y el LED, y cada 6 s
+// manda las acumuladas en un solo envío.
 //
 // Uso:
 //   npm run simular                    (MAC fija de prueba)
@@ -22,12 +23,15 @@ const MAC = (posMac >= 0 && args[posMac + 1] ? args[posMac + 1] : "02:00:00:00:0
 const SIMULAR_FUGA = args.includes("--fuga");
 
 const proyecto = process.env.DB_USER?.split(".")[1];
-const SUPABASE_URL = (process.env.SUPABASE_URL ?? (proyecto ? `https://${proyecto}.supabase.co` : "")).replace(/\/+$/, "");
+const SUPABASE_URL = (process.env.SUPABASE_URL || (proyecto ? `https://${proyecto}.supabase.co` : "")).replace(/\/+$/, "");
 const ANON = process.env.SUPABASE_ANON_KEY;
 
 const FACTOR_K = 7.5;
 const PULSOS_POR_LITRO = 450;
-const INTERVALO_S = 2;
+const INTERVALO_LECTURA_S = 2;   // como ESP32/main.py: una lectura cada 2 s
+const INTERVALO_ENVIO_S = 6;     // y la cola se manda cada 6 s en un solo envío
+const MAX_COLA = 150;
+const MAX_LOTE = 30;
 const UMBRAL_FUGA = 1500;
 const ARCHIVO = path.join(__dirname, "..", ".simulador.json");
 
@@ -92,21 +96,17 @@ function led(caudal: number): { led_estado: string; led_brillo: number } {
   return { led_estado: caudal > 8 ? "rojo" : caudal > 4 ? "amarillo" : "verde", led_brillo: brillo };
 }
 
-async function ciclo() {
-  segundos++;
-  // Con la válvula cerrada no pasa agua
-  const pulsos = valvulaAbierta ? Math.round(caudalDeseado(segundos) * FACTOR_K) : 0;
-  pulsosIntervalo += pulsos;
-  totalPulsos += pulsos;
-  nivel = nivelAgua(segundos);
-  if (nivel >= UMBRAL_FUGA && !fugaLocal) {
-    fugaLocal = true;
-    valvulaAbierta = false;
-    console.log("ALERTA: agua en el piso, se cierra la válvula");
-  }
+interface LecturaEnCola {
+  t: number;
+  datos: Record<string, unknown>;
+}
 
-  if (segundos % INTERVALO_S !== 0) return;
+const cola: LecturaEnCola[] = [];
+let enviando = false;
 
+async function enviar() {
+  if (enviando) return;
+  enviando = true;
   try {
     if (!token) {
       const r = await rpc("anunciar_dispositivo", { p_mac: MAC });
@@ -122,43 +122,78 @@ async function ciclo() {
       }
       return;
     }
+    if (cola.length === 0) return;
 
-    const caudal = pulsosIntervalo / INTERVALO_S / FACTOR_K;
-    const lectura = {
-      caudal_lmin: Number(caudal.toFixed(3)),
-      volumen_l: Number((totalPulsos / PULSOS_POR_LITRO).toFixed(3)),
-      pulsos: pulsosIntervalo,
-      nivel_agua: nivel,
-      fuga: fugaLocal,
-      valvula_abierta: valvulaAbierta,
-      ...led(caudal),
-      ms_atras: 0,
-    };
-    pulsosIntervalo = 0;
-
-    const r = await rpc("registrar_lecturas", { p_token: token, p_lecturas: [lectura] });
+    // Toda la cola en un solo envío, como el ESP32: cada lectura dice hace cuánto se midió
+    const lote = cola.slice(0, MAX_LOTE);
+    const ahora = Date.now();
+    const r = await rpc("registrar_lecturas", {
+      p_token: token,
+      p_lecturas: lote.map((l) => ({ ...l.datos, ms_atras: ahora - l.t })),
+    });
     if (!r.ok) {
       const mensaje = String(r.datos?.message ?? "");
       console.log(`Envío rechazado (${r.status}): ${mensaje}`);
       if (mensaje.includes("token")) {
         token = null;
         guardarToken(null);
+        cola.length = 0;
         console.log("Token inválido: vuelvo a anunciarme");
       }
       return;
     }
+    cola.splice(0, lote.length);   // solo se borra lo que Supabase confirmó
 
     const estado = r.datos;
     // La fuga local se libera cuando el usuario la confirma en el dashboard y el piso está seco
     if (fugaLocal && estado.fugas_pendientes === 0 && nivel < UMBRAL_FUGA) fugaLocal = false;
     valvulaAbierta = !fugaLocal && estado.valvula === "abrir";
+    const ultima = lote[lote.length - 1].datos;
     console.log(
-      `Envío OK · ${lectura.caudal_lmin} L/min · agua ${lectura.nivel_agua} · LED ${lectura.led_estado} ${lectura.led_brillo}% · ` +
+      `Envío OK · ${lote.length} lecturas · ${ultima.caudal_lmin} L/min · agua ${ultima.nivel_agua} · LED ${ultima.led_estado} ${ultima.led_brillo}% · ` +
       `válvula ${valvulaAbierta ? "abierta" : `cerrada (${estado.motivo ?? "local"})`} · hoy ${estado.consumo_hoy_l} L`
     );
   } catch (error) {
-    console.log("Sin conexión con Supabase, se reintenta:", (error as Error).message);
+    console.log(`Sin conexión con Supabase, se reintenta (${cola.length} en cola):`, (error as Error).message);
+  } finally {
+    enviando = false;
   }
+}
+
+function ciclo() {
+  segundos++;
+  // Con la válvula cerrada no pasa agua
+  const pulsos = valvulaAbierta ? Math.round(caudalDeseado(segundos) * FACTOR_K) : 0;
+  pulsosIntervalo += pulsos;
+  totalPulsos += pulsos;
+  nivel = nivelAgua(segundos);
+  if (nivel >= UMBRAL_FUGA && !fugaLocal) {
+    fugaLocal = true;
+    valvulaAbierta = false;
+    console.log("ALERTA: agua en el piso, se cierra la válvula");
+  }
+
+  // Lectura cada INTERVALO_LECTURA_S: se arma y se agrega a la cola
+  if (token && segundos % INTERVALO_LECTURA_S === 0) {
+    const caudal = pulsosIntervalo / INTERVALO_LECTURA_S / FACTOR_K;
+    cola.push({
+      t: Date.now(),
+      datos: {
+        caudal_lmin: Number(caudal.toFixed(3)),
+        volumen_l: Number((totalPulsos / PULSOS_POR_LITRO).toFixed(3)),
+        pulsos: pulsosIntervalo,
+        nivel_agua: nivel,
+        fuga: nivel >= UMBRAL_FUGA,
+        valvula_abierta: valvulaAbierta,
+        ...led(caudal),
+      },
+    });
+    if (cola.length > MAX_COLA) cola.splice(0, cola.length - MAX_COLA);
+  }
+  if (segundos % INTERVALO_LECTURA_S === 0) pulsosIntervalo = 0;
+
+  // Envío cada INTERVALO_ENVIO_S: la cola entera en un solo POST
+  if (segundos % INTERVALO_ENVIO_S === 0) void enviar();
 }
 
 console.log(`Simulando ESP32 ${MAC} -> ${SUPABASE_URL} (Ctrl+C para cortar)`);

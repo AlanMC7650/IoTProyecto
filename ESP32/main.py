@@ -9,8 +9,9 @@
 #   2. Se anuncia en Supabase con su MAC y muestra su código (LED azul parpadeando).
 #   3. El usuario escribe ese código en el dashboard; el ESP32 recibe su token y
 #      lo guarda en token.json.
-#   4. Cada 2 s envía una lectura a Supabase y aplica la orden de la válvula que
-#      viene en la respuesta.
+#   4. Cada 2 s arma una lectura y la guarda en una cola; cada ~6 s manda la cola
+#      a Supabase en un solo envío y aplica la orden de la válvula que viene en la
+#      respuesta (la orden del dashboard tarda hasta ~6 s en llegar).
 # La fuga y el límite diario se resuelven acá mismo, aunque no haya Internet.
 # Mantener presionado el botón BOOT 5 s borra el Wi-Fi y la vinculación.
 
@@ -49,7 +50,9 @@ UMBRAL_FUGA = 1500           # 0-4095: agua en el piso
 UMBRAL_SECO = 800
 CAUDAL_MEDIO = 4.0           # L/min: verde -> amarillo
 CAUDAL_ALTO = 8.0            # L/min: rojo
-INTERVALO_ENVIO_S = 2       # cada envío abre una conexión HTTPS (~1 s): más rápido no conviene
+INTERVALO_LECTURA_S = 2      # cada cuánto se arma una lectura y se agrega a la cola
+INTERVALO_ENVIO_S = 6        # cada cuánto se manda la cola a Supabase: cada envío abre una
+                             # conexión HTTPS nueva que bloquea de 3 a 5 s, por eso va en tandas
 MAX_COLA = 150               # ~5 minutos sin conexión (más no entra en la RAM junto con HTTPS)
 MAX_LOTE = 30
 ESPERA_WIFI_SIN_VINCULAR_S = 30   # sin vincular y sin conectar: vuelve al portal
@@ -241,6 +244,7 @@ valvula_abierta = False
 boton_desde = None
 
 t_segundo = time.ticks_ms()
+t_lectura = t_segundo
 t_envio = t_segundo
 fase = 0
 wdt = WDT(timeout=30000)    # reinicia el ESP32 si el programa se cuelga
@@ -307,10 +311,12 @@ while True:
             mover_valvula(abrir)
             print("Válvula", "ABIERTA" if abrir else "CERRADA")
 
-    # --- Envío, cada INTERVALO_ENVIO_S ---
-    if time.ticks_diff(ahora, t_envio) >= INTERVALO_ENVIO_S * 1000:
-        dt = time.ticks_diff(ahora, t_envio) / 1000
-        t_envio = ahora
+    # --- Lectura, cada INTERVALO_LECTURA_S: se arma y se agrega a la cola ---
+    # Después de un envío (que bloquea unos segundos) dt sale más largo: está bien,
+    # el caudal se divide por el dt real y los pulsos los sigue contando la interrupción.
+    if time.ticks_diff(ahora, t_lectura) >= INTERVALO_LECTURA_S * 1000:
+        dt = time.ticks_diff(ahora, t_lectura) / 1000
+        t_lectura = ahora
 
         if token:
             cola.append((ahora, {
@@ -327,6 +333,10 @@ while True:
                 del cola[:len(cola) - MAX_COLA]   # se descartan las más viejas
         pulsos_intervalo = 0
         nivel_intervalo = 0
+
+    # --- Envío, cada INTERVALO_ENVIO_S: la cola entera en un solo POST ---
+    if time.ticks_diff(ahora, t_envio) >= INTERVALO_ENVIO_S * 1000:
+        t_envio = ahora
 
         if not sta.isconnected():
             if not token and time.ticks_diff(ahora, inicio) > ESPERA_WIFI_SIN_VINCULAR_S * 1000:

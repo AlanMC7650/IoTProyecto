@@ -236,7 +236,8 @@ DECLARE
   d        dispositivo;
   v_n      int;
   v_estado jsonb;
-  v_ultima lectura_caudal;
+  v_ids    bigint[];
+  v_lectura lectura_caudal;
   v_inicio_dia timestamptz := date_trunc('day', now() AT TIME ZONE 'America/La_Paz') AT TIME ZONE 'America/La_Paz';
 BEGIN
   SELECT * INTO d FROM dispositivo
@@ -252,7 +253,9 @@ BEGIN
     RAISE EXCEPTION 'p_lecturas debe ser un arreglo de 1 a 120 lecturas';
   END IF;
 
-  -- Las restricciones CHECK de la tabla rechazan valores fuera de rango
+  -- Las restricciones CHECK de la tabla rechazan valores fuera de rango.
+  -- Se guardan los id insertados para avisar después cada lectura del lote.
+  WITH insertadas AS (
   INSERT INTO lectura_caudal (id_dispositivo, caudal_lmin, volumen_l, pulsos, nivel_agua, fuga,
                               valvula_abierta, led_estado, led_brillo, fecha_medicion)
   SELECT d.id_dispositivo, r.caudal_lmin, r.volumen_l, r.pulsos, r.nivel_agua, coalesce(r.fuga, false),
@@ -261,8 +264,10 @@ BEGIN
          now() - make_interval(secs => least(greatest(coalesce(r.ms_atras, 0), 0), 86400000) / 1000.0)
     FROM jsonb_to_recordset(p_lecturas) AS r(
          caudal_lmin numeric, volumen_l numeric, pulsos int, nivel_agua int, fuga boolean,
-         valvula_abierta boolean, led_estado text, led_brillo int, ms_atras bigint);
-  GET DIAGNOSTICS v_n = ROW_COUNT;
+         valvula_abierta boolean, led_estado text, led_brillo int, ms_atras bigint)
+  RETURNING id_lectura
+  )
+  SELECT array_agg(id_lectura), count(*) INTO v_ids, v_n FROM insertadas;
 
   UPDATE dispositivo SET ultima_conexion = now() WHERE id_dispositivo = d.id_dispositivo;
 
@@ -305,13 +310,18 @@ BEGIN
 
   v_estado := estado_dispositivo(d.id_dispositivo);
 
-  -- Aviso al servidor (LISTEN nueva_lectura) para los dashboards abiertos
-  SELECT * INTO v_ultima FROM lectura_caudal
-   WHERE id_dispositivo = d.id_dispositivo ORDER BY id_lectura DESC LIMIT 1;
-  PERFORM pg_notify('nueva_lectura', jsonb_build_object(
-    'id_dispositivo', d.id_dispositivo,
-    'lectura', to_jsonb(v_ultima) - 'id_dispositivo',
-    'estado', v_estado)::text);
+  -- Aviso al servidor (LISTEN nueva_lectura) para los dashboards abiertos: uno
+  -- por cada lectura del lote (el ESP32 manda ~3 juntas cada 6 s), en orden de
+  -- medición, porque el dashboard descarta los puntos posteriores al que llega.
+  -- Son avisos separados y no un arreglo: el aviso admite hasta 8000 bytes.
+  FOR v_lectura IN
+    SELECT * FROM lectura_caudal WHERE id_lectura = ANY (v_ids) ORDER BY fecha_medicion, id_lectura
+  LOOP
+    PERFORM pg_notify('nueva_lectura', jsonb_build_object(
+      'id_dispositivo', d.id_dispositivo,
+      'lectura', to_jsonb(v_lectura) - 'id_dispositivo',
+      'estado', v_estado)::text);
+  END LOOP;
 
   RETURN jsonb_build_object('guardadas', v_n) || v_estado;
 END;

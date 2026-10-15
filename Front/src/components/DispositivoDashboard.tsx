@@ -26,8 +26,9 @@ const RANGOS: { id: Exclude<RangoId, "personalizado">; label: string; ms: number
   { id: "24h", label: "24 h", ms: 24 * 60 * 60 * 1000 },
 ];
 
-// El ESP32 envía cada 2 s: en línea si la última lectura tiene menos de 10 s
-const MS_EN_LINEA = 10_000;
+// El ESP32 mide cada 2 s pero manda su cola cada ~6 s, y un envío (o dos) puede
+// fallar: en línea si la última lectura tiene menos de 30 s
+const MS_EN_LINEA = 30_000;
 // Resumen y eventos se refrescan cada minuto (cada pedido pasa por ngrok)
 const REFRESCO_RESUMEN_MS = 60_000;
 // Segundos entre lecturas del ESP32, para sumar el tiempo con la válvula cerrada
