@@ -38,7 +38,7 @@ export const DispositivoController = {
   async estado(req: Request, res: Response) {
     const estado = await DispositivoService.estado(
       Number(req.params.id),
-      req.cliente!.id_cliente
+      req.cliente!
     );
     res.json(estado);
   },
@@ -46,7 +46,7 @@ export const DispositivoController = {
   async eventos(req: Request, res: Response) {
     const eventos = await DispositivoService.eventos(
       Number(req.params.id),
-      req.cliente!.id_cliente,
+      req.cliente!,
       req.query.limite as string | undefined
     );
     res.json(eventos);

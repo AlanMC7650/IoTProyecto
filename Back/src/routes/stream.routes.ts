@@ -9,7 +9,8 @@ const router = Router();
 // fetch para poder mandar el token en la cabecera Authorization.
 router.get("/", authMiddleware, async (req, res) => {
   const id_dispositivo = Number(req.query.dispositivo);
-  await DispositivoService.obtenerPropio(id_dispositivo, req.cliente!.id_cliente);
+  // El dueño o el superadmin
+  await DispositivoService.obtenerParaVer(id_dispositivo, req.cliente!);
   RealtimeService.suscribir(id_dispositivo, res);
 });
 

@@ -6,7 +6,7 @@ export const LecturaController = {
   async ultima(req: Request, res: Response) {
     const lectura = await LecturaService.ultima(
       Number(req.params.id),
-      req.cliente!.id_cliente
+      req.cliente!
     );
     res.json(lectura);
   },
@@ -14,7 +14,7 @@ export const LecturaController = {
   async listar(req: Request, res: Response) {
     const lecturas = await LecturaService.listar(
       Number(req.params.id),
-      req.cliente!.id_cliente,
+      req.cliente!,
       req.query as RangoLecturasDTO
     );
     res.json(lecturas);
@@ -23,7 +23,7 @@ export const LecturaController = {
   async resumen(req: Request, res: Response) {
     const resumen = await LecturaService.resumen(
       Number(req.params.id),
-      req.cliente!.id_cliente,
+      req.cliente!,
       req.query as RangoLecturasDTO
     );
     res.json(resumen);

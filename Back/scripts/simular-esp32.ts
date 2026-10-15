@@ -1,6 +1,6 @@
 // Simula un ESP32 de AquaControl para probar sin hardware. Hace lo mismo que
 // ESP32/main.py: se anuncia en Supabase con su MAC, muestra el código para
-// vincularlo desde el dashboard y, una vez vinculado, envía cada 5 s una
+// vincularlo desde el dashboard y, una vez vinculado, envía cada 2 s una
 // lectura con el caudal, el sensor de agua, la válvula y el LED.
 //
 // Uso:
@@ -27,7 +27,7 @@ const ANON = process.env.SUPABASE_ANON_KEY;
 
 const FACTOR_K = 7.5;
 const PULSOS_POR_LITRO = 450;
-const INTERVALO_S = 5;
+const INTERVALO_S = 2;
 const UMBRAL_FUGA = 1500;
 const ARCHIVO = path.join(__dirname, "..", ".simulador.json");
 

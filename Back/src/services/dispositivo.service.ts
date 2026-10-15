@@ -1,6 +1,7 @@
 import { DispositivoRepository } from "../repositories/dispositivo.repository";
 import { EventoRepository } from "../repositories/evento.repository";
 import { AppError } from "../utils/AppError";
+import { TokenPayload } from "../utils/jwt";
 import { Dispositivo, ModoValvula } from "../entities/Dispositivo";
 import {
   ActualizarDispositivoDTO,
@@ -11,8 +12,8 @@ import {
 const MAX_NOMBRE = 100;
 const MAX_PULSOS_POR_LITRO = 99999;
 const MAX_LIMITE_L = 9_999_999;
-// Un dispositivo se considera en línea si envió datos hace menos de 15 s (envía cada 5 s)
-const MS_EN_LINEA = 15_000;
+// Un dispositivo se considera en línea si envió datos hace menos de 10 s (envía cada 2 s)
+const MS_EN_LINEA = 10_000;
 // El código solo sirve si el ESP32 se anunció hace poco (está encendido y esperando)
 const MS_VALIDEZ_CODIGO = 10 * 60 * 1000;
 const MAX_EVENTOS = 100;
@@ -102,6 +103,23 @@ export const DispositivoService = {
     return dispositivo;
   },
 
+  // Para consultar (lecturas, estado, eventos, tiempo real, exportar): el dueño
+  // o el superadmin. Para modificar se sigue usando obtenerPropio: el admin
+  // puede ver los dashboards de los demás, pero no mover su válvula.
+  async obtenerParaVer(id_dispositivo: number, cliente: TokenPayload) {
+    if (cliente.rol !== "admin") {
+      return this.obtenerPropio(id_dispositivo, cliente.id_cliente);
+    }
+    if (!Number.isInteger(id_dispositivo) || id_dispositivo <= 0) {
+      throw new AppError("id de dispositivo inválido", 400);
+    }
+    const dispositivo = await DispositivoRepository.buscarVinculadoPorId(id_dispositivo);
+    if (!dispositivo) {
+      throw new AppError("Dispositivo no encontrado", 404);
+    }
+    return dispositivo;
+  },
+
   async actualizar(
     id_dispositivo: number,
     id_cliente: number,
@@ -157,7 +175,7 @@ export const DispositivoService = {
     return conEstado(await this.obtenerPropio(id_dispositivo, id_cliente));
   },
 
-  // El ESP32 recibe el modo en la respuesta de su próximo envío (menos de 5 s)
+  // El ESP32 recibe el modo en la respuesta de su próximo envío (unos 2 s)
   async cambiarValvula(id_dispositivo: number, id_cliente: number, data: ValvulaDTO) {
     const actual = await this.obtenerPropio(id_dispositivo, id_cliente);
     const modo = data?.modo;
@@ -168,16 +186,16 @@ export const DispositivoService = {
       await DispositivoRepository.actualizar(id_dispositivo, { valvula_modo: modo });
       await EventoRepository.crear(id_dispositivo, "VALVULA", TEXTO_MODO[modo]);
     }
-    return this.estado(id_dispositivo, id_cliente);
-  },
-
-  async estado(id_dispositivo: number, id_cliente: number) {
-    await this.obtenerPropio(id_dispositivo, id_cliente);
     return DispositivoRepository.estado(id_dispositivo);
   },
 
-  async eventos(id_dispositivo: number, id_cliente: number, limite?: string) {
-    await this.obtenerPropio(id_dispositivo, id_cliente);
+  async estado(id_dispositivo: number, cliente: TokenPayload) {
+    await this.obtenerParaVer(id_dispositivo, cliente);
+    return DispositivoRepository.estado(id_dispositivo);
+  },
+
+  async eventos(id_dispositivo: number, cliente: TokenPayload, limite?: string) {
+    await this.obtenerParaVer(id_dispositivo, cliente);
     let cantidad = 20;
     if (limite !== undefined) {
       cantidad = Number(limite);

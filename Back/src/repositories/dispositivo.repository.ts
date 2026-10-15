@@ -28,6 +28,11 @@ export const DispositivoRepository = {
     });
   },
 
+  // Para el superadmin: cualquier dispositivo vinculado, sea de quien sea
+  buscarVinculadoPorId(id_dispositivo: number) {
+    return repo.findOne({ where: { id_dispositivo, estado: "vinculado" } });
+  },
+
   // Dispositivo que se anunció hace poco y todavía no tiene dueño
   buscarPendientePorCodigo(codigo: string, anunciadoDesde: Date) {
     return repo

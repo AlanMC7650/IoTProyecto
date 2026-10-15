@@ -1,5 +1,6 @@
 import { AppDataSource } from "../config/data-source";
 import { ClienteRepository } from "../repositories/cliente.repository";
+import { DispositivoService } from "./dispositivo.service";
 import { AppError } from "../utils/AppError";
 
 interface FilaUsuario {
@@ -26,6 +27,21 @@ export const AdminService = {
        GROUP BY c.id_cliente
        ORDER BY c.fecha_registro DESC`);
     return filas.map((f) => ({ ...f, dispositivos: Number(f.dispositivos) }));
+  },
+
+  // Dispositivos de un usuario, para que el superadmin vea sus dashboards
+  async dispositivosDeUsuario(id_cliente: number) {
+    if (!Number.isInteger(id_cliente) || id_cliente <= 0) {
+      throw new AppError("id de usuario inválido", 400);
+    }
+    const cliente = await ClienteRepository.buscarPorId(id_cliente);
+    if (!cliente) {
+      throw new AppError("Usuario no encontrado", 404);
+    }
+    return {
+      usuario: { id_cliente: cliente.id_cliente, nombre: cliente.nombre, email: cliente.email },
+      dispositivos: await DispositivoService.listar(id_cliente),
+    };
   },
 
   async cambiarActivo(id_admin: number, id_cliente: number, activo: unknown) {

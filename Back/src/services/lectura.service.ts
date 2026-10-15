@@ -2,6 +2,7 @@ import { LecturaRepository } from "../repositories/lectura.repository";
 import { DispositivoService } from "./dispositivo.service";
 import { AppError } from "../utils/AppError";
 import { RangoLecturasDTO } from "../dtos/lectura.dto";
+import { TokenPayload } from "../utils/jwt";
 
 // Las lecturas las inserta la función registrar_lecturas de la BD, que el
 // ESP32 llama directo en Supabase. Este servicio solo las consulta.
@@ -9,8 +10,8 @@ import { RangoLecturasDTO } from "../dtos/lectura.dto";
 const RANGO_POR_DEFECTO_MS = 10 * 60 * 1000;
 const LIMITE_MAXIMO = 5000;
 const MAX_AGRUPAR_S = 24 * 60 * 60;
-// El ESP32 envía una lectura cada 5 s: se usa para estimar el tiempo con la válvula cerrada
-const SEGUNDOS_POR_LECTURA = 5;
+// El ESP32 envía una lectura cada 2 s: se usa para estimar el tiempo con la válvula cerrada
+const SEGUNDOS_POR_LECTURA = 2;
 
 function parsearFecha(valor: string | undefined, campo: string) {
   if (valor === undefined || valor === "") return undefined;
@@ -50,17 +51,18 @@ function numeroONull(valor: string | null) {
 }
 
 export const LecturaService = {
-  async ultima(id_dispositivo: number, id_cliente: number) {
-    await DispositivoService.obtenerPropio(id_dispositivo, id_cliente);
+  // El dueño o el superadmin (que puede ver y exportar los datos de cualquier usuario)
+  async ultima(id_dispositivo: number, cliente: TokenPayload) {
+    await DispositivoService.obtenerParaVer(id_dispositivo, cliente);
     return LecturaRepository.ultimaPorDispositivo(id_dispositivo);
   },
 
   async listar(
     id_dispositivo: number,
-    id_cliente: number,
+    cliente: TokenPayload,
     query: RangoLecturasDTO
   ) {
-    await DispositivoService.obtenerPropio(id_dispositivo, id_cliente);
+    await DispositivoService.obtenerParaVer(id_dispositivo, cliente);
     const { desde, hasta } = parsearRango(query);
     const limite =
       parsearEntero(query.limite, "limite", LIMITE_MAXIMO) ?? LIMITE_MAXIMO;
@@ -97,12 +99,12 @@ export const LecturaService = {
 
   async resumen(
     id_dispositivo: number,
-    id_cliente: number,
+    cliente: TokenPayload,
     query: RangoLecturasDTO
   ) {
-    const dispositivo = await DispositivoService.obtenerPropio(
+    const dispositivo = await DispositivoService.obtenerParaVer(
       id_dispositivo,
-      id_cliente
+      cliente
     );
     const { desde, hasta } = parsearRango(query);
     const fila = await LecturaRepository.resumenPorRango(
