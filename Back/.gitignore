@@ -3,4 +3,5 @@ dist
 .env
 ngrok.yml
 *.log
-.DS_Store.simulador.json
+.DS_Store
+.simulador.json
