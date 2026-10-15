@@ -30,6 +30,31 @@ const RANGOS: { id: Exclude<RangoId, "personalizado">; label: string; ms: number
 const MS_EN_LINEA = 10_000;
 // Resumen y eventos se refrescan cada minuto (cada pedido pasa por ngrok)
 const REFRESCO_RESUMEN_MS = 60_000;
+// Segundos entre lecturas del ESP32, para sumar el tiempo con la válvula cerrada
+const SEGUNDOS_POR_LECTURA = 2;
+// El sensor de agua T1592 todavía no está instalado: su panel queda oculto.
+// Poner en true cuando se conecte.
+const MOSTRAR_SENSOR_AGUA = false;
+
+// Suma una lectura del tiempo real al resumen del rango, así se actualiza al
+// instante sin pedirle nada al Back. Cada minuto se vuelve a pedir el resumen
+// exacto, que además descuenta las lecturas que salieron del rango.
+function sumarLectura(r: ResumenCaudal, l: LecturaCaudal, pulsosPorLitro: number): ResumenCaudal {
+  const caudal = Number(l.caudal_lmin);
+  const cantidad = r.cantidad_lecturas + 1;
+  const segundos_cerrada = r.segundos_valvula_cerrada + (l.valvula_abierta === false ? SEGUNDOS_POR_LECTURA : 0);
+  return {
+    ...r,
+    cantidad_lecturas: cantidad,
+    caudal_promedio: (r.caudal_promedio * r.cantidad_lecturas + caudal) / cantidad,
+    caudal_maximo: Math.max(r.caudal_maximo, caudal),
+    litros_consumidos: r.litros_consumidos + Number(l.pulsos) / pulsosPorLitro,
+    nivel_agua_maximo: l.nivel_agua === null ? r.nivel_agua_maximo : Math.max(r.nivel_agua_maximo ?? 0, l.nivel_agua),
+    lecturas_con_fuga: r.lecturas_con_fuga + (l.fuga ? 1 : 0),
+    segundos_valvula_cerrada: segundos_cerrada,
+    minutos_valvula_cerrada: Math.round(segundos_cerrada / 60),
+  };
+}
 
 // Hasta 15 minutos se dibuja cada lectura (una cada 2 s). En rangos más
 // largos el Back promedia por intervalos para no dibujar miles de puntos.
@@ -101,6 +126,8 @@ export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculad
   const rangoVivoRef = useRef(rangoVivo);
   rangoVivoRef.current = rangoVivo;
   const recargarRef = useRef<() => void>(() => undefined);
+  const pulsosPorLitroRef = useRef(Number(dispositivo.pulsos_por_litro));
+  pulsosPorLitroRef.current = Number(dispositivo.pulsos_por_litro);
 
   function ventanaActual(): { desde: Date; hasta: Date | null } | null {
     if (rangoVivo) return { desde: new Date(Date.now() - rangoVivo.ms), hasta: null };
@@ -179,6 +206,7 @@ export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculad
         });
         const rango = rangoVivoRef.current;
         if (!rango) return;
+        setResumen((r) => (r ? sumarLectura(r, lectura, pulsosPorLitroRef.current) : r));
         const punto = aPunto(lectura);
         setPuntos((prev) => {
           const minimo = Date.now() - rango.ms;
@@ -362,7 +390,9 @@ export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculad
 
       <div className="paneles">
         <PanelFlujo {...comun} estado={estado} resumen={resumen} onGuardarLimite={soloLectura ? undefined : onGuardarLimite} />
-        <PanelAgua {...comun} estado={estado} onConfirmarFuga={soloLectura ? undefined : onConfirmarFuga} />
+        {MOSTRAR_SENSOR_AGUA && (
+          <PanelAgua {...comun} estado={estado} onConfirmarFuga={soloLectura ? undefined : onConfirmarFuga} />
+        )}
         <PanelValvula {...comun} estado={estado} resumen={resumen} onModo={soloLectura ? undefined : onModo} />
         <PanelLed {...comun} />
       </div>

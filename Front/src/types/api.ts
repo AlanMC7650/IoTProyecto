@@ -92,6 +92,7 @@ export interface ResumenCaudal {
   nivel_agua_maximo: number | null;
   lecturas_con_fuga: number;
   minutos_valvula_cerrada: number;
+  segundos_valvula_cerrada: number;
 }
 
 export interface Evento {

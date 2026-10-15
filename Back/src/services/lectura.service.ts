@@ -129,6 +129,8 @@ export const LecturaService = {
       nivel_agua_maximo: numeroONull(fila?.nivel_agua_maximo ?? null),
       lecturas_con_fuga: Number(fila?.lecturas_con_fuga ?? 0),
       minutos_valvula_cerrada: Math.round((cerrada * SEGUNDOS_POR_LECTURA) / 60),
+      // Sin redondear: el dashboard le va sumando las lecturas que llegan en tiempo real
+      segundos_valvula_cerrada: cerrada * SEGUNDOS_POR_LECTURA,
     };
   },
 };
