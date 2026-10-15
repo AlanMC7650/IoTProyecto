@@ -5,14 +5,14 @@ Qué cambió respecto al caudalímetro de la fase anterior y cómo levantar todo
 ## Arquitectura
 
 ```
-ESP32 ──HTTPS cada 5 s──> Supabase (PostgreSQL + funciones)
+ESP32 ──HTTPS cada 2 s──> Supabase (PostgreSQL + funciones)
                               │  NOTIFY nueva_lectura
                               ▼
 Navegador <──ngrok──> Back (Node/Express en la PC) ──SQL──┘
               (REST + tiempo real por SSE)
 ```
 
-- **El ESP32 no pasa por ngrok.** El plan gratuito de ngrok permite 20 000 peticiones por mes y un ESP32 enviando cada 5 s haría unas 518 000. El ESP32 llama directo a dos funciones de Supabase (`anunciar_dispositivo` y `registrar_lecturas`), que no tienen límite de peticiones en el plan gratuito.
+- **El ESP32 no pasa por ngrok.** El plan gratuito de ngrok permite 20 000 peticiones por mes y un ESP32 enviando cada 2 s haría alrededor de 1,3 millones. El ESP32 llama directo a dos funciones de Supabase (`anunciar_dispositivo` y `registrar_lecturas`), que no tienen límite de peticiones en el plan gratuito.
 - **ngrok solo publica el Back**, que sirve el dashboard y la API. El tiempo real usa Server-Sent Events: una sola petición por pestaña abierta.
 - Si la PC del Back está apagada, las lecturas igual se guardan en Supabase.
 
@@ -88,6 +88,7 @@ npm run simular -- --fuga    # además simula agua en el piso al minuto
 | `DELETE /api/dispositivos/:id` | Desvincula: borra lecturas y eventos, el token deja de valer y el ESP32 vuelve a mostrar su código |
 | `GET /api/stream?dispositivo=:id` | Tiempo real (SSE), alimentado por `LISTEN nueva_lectura` |
 | `GET /api/admin/usuarios` | Solo admin: usuarios con cantidad de dispositivos y último dato |
+| `GET /api/admin/usuarios/:id/dispositivos` | Solo admin: dispositivos de un usuario, para ver sus dashboards |
 | `PATCH /api/admin/usuarios/:id` | Solo admin: `{ "activo": false }` suspende la cuenta |
 
 Se quitaron `POST /api/lecturas` (con `X-API-Key`), `POST /api/dispositivos` y `regenerar-clave`: ahora el ESP32 escribe en Supabase y se vincula por código. El middleware de autenticación lee el rol y el estado de la cuenta en cada petición, así que una suspensión vale aunque el token no haya vencido.
@@ -103,11 +104,18 @@ Se quitaron `POST /api/lecturas` (con `X-API-Key`), `POST /api/dispositivos` y `
   - **Eventos recientes.**
 - Se actualiza en tiempo real por SSE; la lista de dispositivos se refresca cada 60 s (cada pedido pasa por ngrok).
 - **Página `/admin`** solo para el rol admin, con buscador y botón para suspender o reactivar cuentas.
+- **Página `/admin/usuarios/:id`:** el admin ve los dashboards de cualquier usuario (mismos paneles, en tiempo real) y exporta sus datos a CSV. Es solo lectura: no puede mover la válvula, cambiar el límite ni desvincular.
 - La marca pasó de FlowLab a AquaControl.
 
 ### ESP32
 
 `main.py` nuevo y `portal.py`. Detalle en [ESP32/README.md](../ESP32/README.md).
+
+### Velocidad y permisos del admin (segunda ronda)
+
+- **Envío cada 2 s (antes 5 s)** en el ESP32 y en el simulador. No se baja más porque cada envío abre una conexión HTTPS, que en el ESP32 tarda alrededor de 1 s. El dashboard marca "en línea" con menos de 10 s sin datos y actualiza ese estado cada segundo.
+- **Limpieza automática en la BD:** con una lectura cada 2 s se suman ~43 000 filas por día y por dispositivo. `registrar_lecturas` borra de vez en cuando (1 de cada 100 envíos) las lecturas de más de 30 días de ese dispositivo, para no llenar los 500 MB del plan gratuito.
+- **Superadmin con permiso de lectura sobre todos los dispositivos:** lecturas, resumen, estado, eventos, tiempo real y exportación. Las acciones que modifican (válvula, límite, configuración, confirmar fuga, desvincular) siguen siendo solo del dueño.
 
 ## Qué se probó
 
@@ -115,6 +123,7 @@ Se quitaron `POST /api/lecturas` (con `X-API-Key`), `POST /api/dispositivos` y `
 - **API completa contra Supabase:** registro, login, vinculación (código mal, inexistente, ya tomado), lecturas, agrupado y resumen, límite, válvula, confirmación de fuga, superadmin (403 para usuarios comunes, suspensión y reactivación) y desvinculación.
 - **Tiempo real:** una lectura insertada en Supabase llegó al navegador por SSE.
 - **`ESP32/main.py`:** corrido en la PC con imitaciones de los módulos de MicroPython, llamando a las funciones reales de Supabase. Mostró el código, recibió el token al vincularse, el LED cambió con el caudal, cerró la válvula ante la fuga, esperó la confirmación para reabrir y cerró al alcanzar el límite.
+- **Permisos del admin:** ve, exporta y recibe en tiempo real los datos ajenos (200), y recibe 404 al intentar mover la válvula, cambiar el límite o desvincular. Un usuario común no ve nada ajeno (404) ni entra a `/admin` (403). Una lectura tardó ~1 s desde la llamada a Supabase hasta llegar al navegador.
 - **Dashboard en el navegador:** los cuatro paneles con datos en vivo, los botones de la válvula y la página de admin.
 
 **No probado:**

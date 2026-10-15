@@ -9,7 +9,7 @@
 #   2. Se anuncia en Supabase con su MAC y muestra su código (LED azul parpadeando).
 #   3. El usuario escribe ese código en el dashboard; el ESP32 recibe su token y
 #      lo guarda en token.json.
-#   4. Cada 5 s envía una lectura a Supabase y aplica la orden de la válvula que
+#   4. Cada 2 s envía una lectura a Supabase y aplica la orden de la válvula que
 #      viene en la respuesta.
 # La fuga y el límite diario se resuelven acá mismo, aunque no haya Internet.
 # Mantener presionado el botón BOOT 5 s borra el Wi-Fi y la vinculación.
@@ -49,9 +49,9 @@ UMBRAL_FUGA = 1500           # 0-4095: agua en el piso
 UMBRAL_SECO = 800
 CAUDAL_MEDIO = 4.0           # L/min: verde -> amarillo
 CAUDAL_ALTO = 8.0            # L/min: rojo
-INTERVALO_ENVIO_S = 5
-MAX_COLA = 120               # ~10 minutos sin conexión
-MAX_LOTE = 20
+INTERVALO_ENVIO_S = 2       # cada envío abre una conexión HTTPS (~1 s): más rápido no conviene
+MAX_COLA = 150               # ~5 minutos sin conexión (más no entra en la RAM junto con HTTPS)
+MAX_LOTE = 30
 ESPERA_WIFI_SIN_VINCULAR_S = 30   # sin vincular y sin conectar: vuelve al portal
 SEGUNDOS_SECO_SIN_SERVIDOR = 30   # sin vincular, la fuga se libera sola al secarse
 RELE_ACTIVO_EN_ALTO = getattr(config, "RELE_ACTIVO_EN_ALTO", True)
@@ -307,7 +307,7 @@ while True:
             mover_valvula(abrir)
             print("Válvula", "ABIERTA" if abrir else "CERRADA")
 
-    # --- Envío, cada 5 s ---
+    # --- Envío, cada INTERVALO_ENVIO_S ---
     if time.ticks_diff(ahora, t_envio) >= INTERVALO_ENVIO_S * 1000:
         dt = time.ticks_diff(ahora, t_envio) / 1000
         t_envio = ahora

@@ -78,7 +78,7 @@ ALTER TABLE dispositivo DROP CONSTRAINT IF EXISTS chk_dispositivo_vinculado;
 ALTER TABLE dispositivo ADD CONSTRAINT chk_dispositivo_vinculado
   CHECK (estado = 'pendiente' OR (id_cliente IS NOT NULL AND nombre IS NOT NULL));
 
--- Cada lectura del ESP32 (una cada 5 s, con el promedio del intervalo y el
+-- Cada lectura del ESP32 (una cada 2 s, con el promedio del intervalo y el
 -- estado de los actuadores en ese momento)
 CREATE TABLE IF NOT EXISTS lectura_caudal (
     id_lectura       BIGSERIAL PRIMARY KEY,
@@ -293,6 +293,14 @@ BEGIN
                                                     AND caudal_lmin = 0) THEN
     INSERT INTO evento (id_dispositivo, tipo, detalle)
     VALUES (d.id_dispositivo, 'FLUJO_CONTINUO', 'El agua lleva 30 minutos corriendo sin parar');
+  END IF;
+
+  -- Con una lectura cada 2 s se suman ~43 000 filas por día y por dispositivo.
+  -- De vez en cuando (1 de cada 100 envíos) se borran las de más de 30 días,
+  -- para no llenar los 500 MB del plan gratuito de Supabase.
+  IF random() < 0.01 THEN
+    DELETE FROM lectura_caudal
+     WHERE id_dispositivo = d.id_dispositivo AND fecha_medicion < now() - interval '30 days';
   END IF;
 
   v_estado := estado_dispositivo(d.id_dispositivo);

@@ -26,16 +26,16 @@ const RANGOS: { id: Exclude<RangoId, "personalizado">; label: string; ms: number
   { id: "24h", label: "24 h", ms: 24 * 60 * 60 * 1000 },
 ];
 
-// El ESP32 envía cada 5 s: en línea si la última lectura tiene menos de 15 s
-const MS_EN_LINEA = 15_000;
+// El ESP32 envía cada 2 s: en línea si la última lectura tiene menos de 10 s
+const MS_EN_LINEA = 10_000;
 // Resumen y eventos se refrescan cada minuto (cada pedido pasa por ngrok)
 const REFRESCO_RESUMEN_MS = 60_000;
 
-// Hasta 30 minutos se dibuja cada lectura (una cada 5 s). En rangos más
+// Hasta 15 minutos se dibuja cada lectura (una cada 2 s). En rangos más
 // largos el Back promedia por intervalos para no dibujar miles de puntos.
-const SIN_AGRUPAR_HASTA_MS = 30 * 60 * 1000;
-const MAX_PUNTOS = 400;
-const INTERVALOS_S = [10, 30, 60, 120, 300, 600, 1800, 3600, 7200, 21600, 86400];
+const SIN_AGRUPAR_HASTA_MS = 15 * 60 * 1000;
+const MAX_PUNTOS = 450;
+const INTERVALOS_S = [5, 10, 30, 60, 120, 300, 600, 1800, 3600, 7200, 21600, 86400];
 
 const TEXTO_EVENTO: Record<Evento["tipo"], string> = {
   FUGA: "Fuga",
@@ -64,11 +64,14 @@ function aPunto(l: LecturaCaudal): PuntoLectura {
 
 interface Props {
   dispositivo: Dispositivo;
-  onActualizado: (dispositivo: Dispositivo) => void;
-  onDesvinculado: (id_dispositivo: number) => void;
+  onActualizado?: (dispositivo: Dispositivo) => void;
+  onDesvinculado?: (id_dispositivo: number) => void;
+  // El superadmin mirando el dispositivo de otro usuario: ve y exporta, pero no
+  // cambia la válvula, el límite ni la configuración
+  soloLectura?: boolean;
 }
 
-export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculado }: Props) {
+export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculado, soloLectura = false }: Props) {
   const { id_dispositivo } = dispositivo;
 
   const [rangoId, setRangoId] = useState<RangoId>("10m");
@@ -188,7 +191,7 @@ export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculad
 
   // Reloj para "en línea" y para refrescar el resumen sin recargar todo
   useEffect(() => {
-    const reloj = setInterval(() => setAhora(Date.now()), 5000);
+    const reloj = setInterval(() => setAhora(Date.now()), 1000);
     const resumenTimer = setInterval(() => {
       if (document.visibilityState === "visible") cargarResumenYEventos().catch(() => undefined);
     }, REFRESCO_RESUMEN_MS);
@@ -240,7 +243,7 @@ export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculad
     e.preventDefault();
     setGuardando(true);
     await accion(async () => {
-      onActualizado(await DispositivosApi.actualizar(id_dispositivo, {
+      onActualizado?.(await DispositivosApi.actualizar(id_dispositivo, {
         nombre,
         pulsos_por_litro: Number(pulsosPorLitro),
       }));
@@ -250,7 +253,7 @@ export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculad
 
   const onGuardarLimite = (litros: number | null) =>
     accion(async () => {
-      onActualizado(await DispositivosApi.actualizar(id_dispositivo, { limite_diario_l: litros }));
+      onActualizado?.(await DispositivosApi.actualizar(id_dispositivo, { limite_diario_l: litros }));
       setEstado(await DispositivosApi.estado(id_dispositivo));
     }, "No se pudo guardar el límite");
 
@@ -270,7 +273,7 @@ export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculad
     if (!window.confirm(`¿Desvincular “${dispositivo.nombre}”? Se borran todas sus lecturas y eventos. El ESP32 vuelve a mostrar su código para vincularlo de nuevo.`)) return;
     await accion(async () => {
       await DispositivosApi.desvincular(id_dispositivo);
-      onDesvinculado(id_dispositivo);
+      onDesvinculado?.(id_dispositivo);
     }, "No se pudo desvincular el dispositivo");
   }
 
@@ -298,12 +301,16 @@ export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculad
             {conectado ? "Tiempo real activo" : "Reconectando tiempo real…"}
           </p>
         </div>
-        <button type="button" className="btn-secundario" onClick={() => setMostrarConfig((v) => !v)}>
-          {mostrarConfig ? "Cerrar configuración" : "Configuración"}
-        </button>
+        {soloLectura ? (
+          <span className="etiqueta-solo-lectura">Vista de administrador · solo lectura</span>
+        ) : (
+          <button type="button" className="btn-secundario" onClick={() => setMostrarConfig((v) => !v)}>
+            {mostrarConfig ? "Cerrar configuración" : "Configuración"}
+          </button>
+        )}
       </header>
 
-      {mostrarConfig && (
+      {mostrarConfig && !soloLectura && (
         <div className="panel">
           <form className="generar-form" onSubmit={onGuardar}>
             <label>
@@ -354,9 +361,9 @@ export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculad
       )}
 
       <div className="paneles">
-        <PanelFlujo {...comun} estado={estado} resumen={resumen} onGuardarLimite={onGuardarLimite} />
-        <PanelAgua {...comun} estado={estado} onConfirmarFuga={onConfirmarFuga} />
-        <PanelValvula {...comun} estado={estado} resumen={resumen} onModo={onModo} />
+        <PanelFlujo {...comun} estado={estado} resumen={resumen} onGuardarLimite={soloLectura ? undefined : onGuardarLimite} />
+        <PanelAgua {...comun} estado={estado} onConfirmarFuga={soloLectura ? undefined : onConfirmarFuga} />
+        <PanelValvula {...comun} estado={estado} resumen={resumen} onModo={soloLectura ? undefined : onModo} />
         <PanelLed {...comun} />
       </div>
 

@@ -1,9 +1,14 @@
 import { api } from "./api";
-import type { UsuarioAdmin } from "../types/api";
+import type { DispositivosDeUsuario, UsuarioAdmin } from "../types/api";
 
 export const AdminApi = {
   async usuarios(): Promise<UsuarioAdmin[]> {
     const { data } = await api.get<UsuarioAdmin[]>("/admin/usuarios");
+    return data;
+  },
+
+  async dispositivosDeUsuario(id_cliente: number): Promise<DispositivosDeUsuario> {
+    const { data } = await api.get<DispositivosDeUsuario>(`/admin/usuarios/${id_cliente}/dispositivos`);
     return data;
   },
 

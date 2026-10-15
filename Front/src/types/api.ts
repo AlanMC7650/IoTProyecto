@@ -121,6 +121,11 @@ export interface UsuarioAdmin {
   ultima_conexion: string | null;
 }
 
+export interface DispositivosDeUsuario {
+  usuario: { id_cliente: number; nombre: string; email: string };
+  dispositivos: Dispositivo[];
+}
+
 export interface ApiErrorBody {
   error: string;
 }

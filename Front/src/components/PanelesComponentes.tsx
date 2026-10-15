@@ -51,7 +51,8 @@ export function PanelFlujo({
 }: Comun & {
   estado: EstadoDispositivo | null;
   resumen: ResumenCaudal | null;
-  onGuardarLimite: (litros: number | null) => Promise<void>;
+  // Sin esta función el panel es de solo lectura (superadmin mirando a otro usuario)
+  onGuardarLimite?: (litros: number | null) => Promise<void>;
 }) {
   const [editando, setEditando] = useState(false);
   const [limite, setLimite] = useState("");
@@ -61,7 +62,7 @@ export function PanelFlujo({
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    await onGuardarLimite(limite.trim() === "" ? null : Number(limite));
+    await onGuardarLimite?.(limite.trim() === "" ? null : Number(limite));
     setEditando(false);
   }
 
@@ -83,7 +84,7 @@ export function PanelFlujo({
           {limiteActual !== null && (
             <div className="barra"><div style={{ width: `${porcentaje}%`, background: porcentaje >= 100 ? COLOR_UMBRAL : COLOR_CAUDAL }} /></div>
           )}
-          {editando ? (
+          {!onGuardarLimite ? null : editando ? (
             <form className="limite-form" onSubmit={onSubmit}>
               <input type="number" min={0.1} step="any" value={limite} onChange={(e) => setLimite(e.target.value)} placeholder="Litros (vacío = sin límite)" autoFocus />
               <button type="submit">Guardar</button>
@@ -113,7 +114,7 @@ export function PanelFlujo({
 
 export function PanelAgua({
   ultima, enVivo, puntos, sinDatos, estado, onConfirmarFuga,
-}: Comun & { estado: EstadoDispositivo | null; onConfirmarFuga: () => Promise<void> }) {
+}: Comun & { estado: EstadoDispositivo | null; onConfirmarFuga?: () => Promise<void> }) {
   const pct = enVivo ? aguaPct(ultima?.nivel_agua) : null;
   const pendientes = estado?.fugas_pendientes ?? 0;
   const mojado = pct !== null && pct >= UMBRAL_FUGA_PCT;
@@ -138,7 +139,7 @@ export function PanelAgua({
           {pendientes > 0 && (
             <div className="alerta-fuga">
               <span>Fuga sin confirmar: la válvula sigue cerrada.</span>
-              <button type="button" onClick={onConfirmarFuga}>Ya revisé la fuga</button>
+              {onConfirmarFuga && <button type="button" onClick={onConfirmarFuga}>Ya revisé la fuga</button>}
             </div>
           )}
         </div>
@@ -161,7 +162,7 @@ export function PanelValvula({
 }: Comun & {
   estado: EstadoDispositivo | null;
   resumen: ResumenCaudal | null;
-  onModo: (modo: ModoValvula) => Promise<void>;
+  onModo?: (modo: ModoValvula) => Promise<void>;
 }) {
   // Lo que reportó el ESP32 en su última lectura; si no está en línea, lo que debería hacer
   const abierta = enVivo && ultima?.valvula_abierta !== null && ultima?.valvula_abierta !== undefined
@@ -186,18 +187,18 @@ export function PanelValvula({
         </div>
         <div className="valvula-info">
           <span className="panel-detalle">{motivo ?? (modo === "abierta" ? "Abierta manualmente" : "Modo automático")}</span>
-          <div className="botones-modo">
+          {onModo && <div className="botones-modo">
             {(["abierta", "cerrada", "auto"] as ModoValvula[]).map((m) => (
               <button key={m} type="button" className={m === modo ? "activa" : ""} onClick={() => onModo(m)}>
                 {m === "abierta" ? "Abrir" : m === "cerrada" ? "Cerrar" : "Automático"}
               </button>
             ))}
-          </div>
+          </div>}
         </div>
       </div>
       <p className="panel-detalle">
         {resumen ? `En el rango estuvo cerrada ${resumen.minutos_valvula_cerrada} min` : " "}
-        {esperandoEsp32 && ` · Orden enviada: ${estado?.valvula}. El ESP32 la aplica en su próximo envío (menos de 5 s)`}
+        {esperandoEsp32 && ` · Orden enviada: ${estado?.valvula}. El ESP32 la aplica en su próximo envío (unos 2 s)`}
         {!enVivo && " · La orden llega al ESP32 cuando vuelva a conectarse"}
       </p>
       <Grafica puntos={puntos} sinDatos={sinDatos}>

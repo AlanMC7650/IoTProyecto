@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { AdminApi } from "../services/admin.service";
 import { mensajeError } from "../services/errors";
@@ -8,6 +8,7 @@ import { haceCuanto } from "../utils/tiempo";
 
 export function AdminPage() {
   const { cliente } = useAuth();
+  const navigate = useNavigate();
   const [usuarios, setUsuarios] = useState<UsuarioAdmin[]>([]);
   const [filtro, setFiltro] = useState("");
   const [cargando, setCargando] = useState(true);
@@ -52,7 +53,7 @@ export function AdminPage() {
         <div>
           <div className="dashboard-kicker">Superadministrador</div>
           <h1>Usuarios registrados</h1>
-          <p>Cuentas creadas en AquaControl y sus dispositivos.</p>
+          <p>Cuentas creadas en AquaControl. Desde “Ver dashboards” podés mirar y exportar los datos de cada usuario.</p>
         </div>
         <Link to="/dashboard" className="btn-secundario">← Volver al dashboard</Link>
       </header>
@@ -80,6 +81,7 @@ export function AdminPage() {
                   <th>Registro</th>
                   <th>Dispositivos</th>
                   <th>Último dato</th>
+                  <th>Dashboards</th>
                   <th>Estado</th>
                 </tr>
               </thead>
@@ -93,6 +95,15 @@ export function AdminPage() {
                     <td>{new Date(u.fecha_registro).toLocaleDateString()}</td>
                     <td>{u.dispositivos}</td>
                     <td>{u.ultima_conexion ? haceCuanto(u.ultima_conexion) : "—"}</td>
+                    <td>
+                      {u.dispositivos > 0 ? (
+                        <button type="button" className="btn-secundario" onClick={() => navigate(`/admin/usuarios/${u.id_cliente}`)}>
+                          Ver dashboards
+                        </button>
+                      ) : (
+                        <span className="muted">—</span>
+                      )}
+                    </td>
                     <td>
                       {u.rol === "admin" || u.id_cliente === cliente?.id_cliente ? (
                         <span className="muted">Activo</span>
