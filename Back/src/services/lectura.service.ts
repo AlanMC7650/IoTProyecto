@@ -10,8 +10,8 @@ import { TokenPayload } from "../utils/jwt";
 const RANGO_POR_DEFECTO_MS = 10 * 60 * 1000;
 const LIMITE_MAXIMO = 5000;
 const MAX_AGRUPAR_S = 24 * 60 * 60;
-// El ESP32 envía una lectura cada 2 s: se usa para estimar el tiempo con la válvula cerrada
-const SEGUNDOS_POR_LECTURA = 2;
+// El ESP32 envía una lectura cada 5 s: se usa para estimar el tiempo con la válvula cerrada
+const SEGUNDOS_POR_LECTURA = 5;
 
 function parsearFecha(valor: string | undefined, campo: string) {
   if (valor === undefined || valor === "") return undefined;

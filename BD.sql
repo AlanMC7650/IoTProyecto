@@ -78,7 +78,7 @@ ALTER TABLE dispositivo DROP CONSTRAINT IF EXISTS chk_dispositivo_vinculado;
 ALTER TABLE dispositivo ADD CONSTRAINT chk_dispositivo_vinculado
   CHECK (estado = 'pendiente' OR (id_cliente IS NOT NULL AND nombre IS NOT NULL));
 
--- Cada lectura del ESP32 (una cada 2 s, con el promedio del intervalo y el
+-- Cada lectura del ESP32 (una cada 5 s, con el promedio del intervalo y el
 -- estado de los actuadores en ese momento)
 CREATE TABLE IF NOT EXISTS lectura_caudal (
     id_lectura       BIGSERIAL PRIMARY KEY,
@@ -300,7 +300,7 @@ BEGIN
     VALUES (d.id_dispositivo, 'FLUJO_CONTINUO', 'El agua lleva 30 minutos corriendo sin parar');
   END IF;
 
-  -- Con una lectura cada 2 s se suman ~43 000 filas por día y por dispositivo.
+  -- Con una lectura cada 5 s se suman ~17 000 filas por día y por dispositivo.
   -- De vez en cuando (1 de cada 100 envíos) se borran las de más de 30 días,
   -- para no llenar los 500 MB del plan gratuito de Supabase.
   IF random() < 0.01 THEN
@@ -311,7 +311,7 @@ BEGIN
   v_estado := estado_dispositivo(d.id_dispositivo);
 
   -- Aviso al servidor (LISTEN nueva_lectura) para los dashboards abiertos: uno
-  -- por cada lectura del lote (el ESP32 manda ~3 juntas cada 6 s), en orden de
+  -- por cada lectura del lote (normalmente una; varias si el ESP32 se pone al día después de un corte), en orden de
   -- medición, porque el dashboard descarta los puntos posteriores al que llega.
   -- Son avisos separados y no un arreglo: el aviso admite hasta 8000 bytes.
   FOR v_lectura IN

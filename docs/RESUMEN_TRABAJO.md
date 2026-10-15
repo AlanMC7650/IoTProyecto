@@ -9,7 +9,7 @@ Archivo: [Fase2/Informe_AquaControl_2da_Evaluacion_v2.docx](../Fase2/Informe_Aqu
 - **Contenido:** 22 páginas, figuras en [Fase2/figuras](../Fase2/figuras) (arquitectura, circuito, modelo entidad-relación, secuencia de vinculación y maqueta del dashboard) y tablas de conexiones, endpoints, errores y problemas con sus soluciones.
 - **Decisiones de diseño que explica:**
   - **Sensor T1592:** se usa como detector de fugas en el piso, bajo la instalación. Si se moja, el ESP32 cierra la válvula al instante.
-  - **El ESP32 envía directo a Supabase y no por ngrok:** el plan gratuito de ngrok permite 20 000 peticiones por mes, y un ESP32 enviando cada 5 s haría unas 518 000 (y cada 2 s, como quedó después, ~1,3 millones).
+  - **El ESP32 envía directo a Supabase y no por ngrok:** el plan gratuito de ngrok permite 20 000 peticiones por mes, y un ESP32 enviando cada 5 s haría unas 518 000 (se probó cada 2 s, ~1,3 millones, y se volvió a 5 s).
   - **Dashboard de los actuadores:** la electroválvula y el LED se muestran por su estado en el tiempo. La válvula tiene estado, botones e historial; el LED se muestra como "gemelo digital", con su color y brillo.
   - **Electroválvula normalmente cerrada:** si se corta la luz o el ESP32 falla, el agua queda cortada.
 - **Falta completar:** el número de grupo, la fecha de entrega y las capturas reales (marcadas como `[Insertar captura: …]`).
@@ -54,12 +54,12 @@ Todavía sin commitear. Detalle en [FASE2.md](FASE2.md).
 |---|---|
 | Back | Vinculación por código, válvula (abrir, cerrar, automático), límite diario, eventos y confirmación de fugas, desvincular, tiempo real por SSE (una sola petición por pestaña, importante para ngrok) y panel de superadmin con suspensión de cuentas. Se quitó el envío con clave API. |
 | Front | Cuatro paneles (flujo, sensor de agua, electroválvula, LED), lista de eventos, pantalla para vincular por código y página `/admin`. La marca pasó a AquaControl. |
-| ESP32 | `portal.py` (configurar el Wi-Fi desde el celular) y `main.py` nuevo: se vincula solo, arma una lectura cada 2 s, envía la cola a Supabase cada ~6 s y controla relé, LED y sensor de agua. Fuga y límite funcionan sin Internet; el botón BOOT borra la configuración. |
+| ESP32 | `portal.py` (configurar el Wi-Fi desde el celular) y `main.py` nuevo: se vincula solo, envía una lectura a Supabase cada 5 s y controla relé, LED y sensor de agua. Fuga y límite funcionan sin Internet; el botón BOOT borra la configuración. |
 | Simulador | `npm run simular` hace lo mismo que el ESP32, para probar sin hardware. |
 
 ## 6. Segunda ronda: más velocidad y admin con acceso a todos los dashboards
 
-- **Más velocidad:** los datos ahora se miden cada 2 s en vez de cada 5 s (después se pasó a enviarlos en tandas cada ~6 s, ver [ARREGLO_TIEMPO_REAL.md](ARREGLO_TIEMPO_REAL.md)) y el estado "en línea" se actualiza cada segundo. Para no llenar Supabase, la BD borra sola las lecturas de más de 30 días.
+- **Velocidad:** se probó medir cada 2 s y enviar en tandas cada ~6 s (ver [ARREGLO_TIEMPO_REAL.md](ARREGLO_TIEMPO_REAL.md)), pero por el costo de abrir una conexión HTTPS en cada envío el dashboard quedaba más lento; se volvió a una lectura cada 5 s. El estado "en línea" se actualiza cada segundo y tolera 30 s sin datos. Para no llenar Supabase, la BD borra sola las lecturas de más de 30 días.
 - **Superadmin:** puede abrir los dashboards de cualquier usuario desde "Ver dashboards" en `/admin`, verlos en tiempo real y exportarlos a CSV. Es solo lectura: no puede mover válvulas ni cambiar configuraciones ajenas.
 
 ## 7. Qué se probó y qué no
@@ -83,7 +83,7 @@ Todavía sin commitear. Detalle en [FASE2.md](FASE2.md).
 ## 8. Pendientes del equipo
 
 1. Revisar los cambios y hacer el commit.
-2. Volver a grabar `ESP32/main.py` con Thonny en el ESP32 que ya está funcionando (lectura cada 2 s, envío cada ~6 s).
+2. Volver a grabar `ESP32/main.py` con Thonny en el ESP32 que ya está funcionando (una lectura cada 5 s).
 3. Borrar la línea `VITE_API_URL` de `Front/.env`. Con esa línea, el dashboard solo funciona si ngrok está corriendo, incluso abierto en `localhost`.
 4. Nombrar el primer superadmin en el editor SQL de Supabase:
    ```sql
@@ -99,7 +99,7 @@ Todavía sin commitear. Detalle en [FASE2.md](FASE2.md).
 |---|---|---|
 | Seguridad por usuario en la BD | Rol propio de base de datos con políticas por usuario | RLS bloquea la API pública de Supabase y la API del Back filtra por usuario en cada consulta |
 | Ubicación del SQL | Carpeta `supabase/` | `BD.sql` en la raíz |
-| Frecuencia de envío | Cada 5 s | Una lectura cada 2 s, enviadas en tandas cada ~6 s |
+| Frecuencia de envío | Cada 5 s | Cada 5 s (se probó 2 s y se volvió atrás) |
 | Superadmin | Solo ve la lista de usuarios | También ve y exporta los dashboards de cada usuario (solo lectura) |
 
 Conviene ajustar el informe o el código antes de entregar, para que coincidan.

@@ -13,7 +13,7 @@ const MAX_NOMBRE = 100;
 const MAX_PULSOS_POR_LITRO = 99999;
 const MAX_LIMITE_L = 9_999_999;
 // Un dispositivo se considera en línea si envió datos hace menos de 30 s: el ESP32
-// manda su cola cada ~6 s y un envío (o dos) puede fallar sin que esté desconectado
+// envía cada 5 s y un envío (o dos) puede fallar sin que esté desconectado
 const MS_EN_LINEA = 30_000;
 // El código solo sirve si el ESP32 se anunció hace poco (está encendido y esperando)
 const MS_VALIDEZ_CODIGO = 10 * 60 * 1000;
@@ -176,7 +176,7 @@ export const DispositivoService = {
     return conEstado(await this.obtenerPropio(id_dispositivo, id_cliente));
   },
 
-  // El ESP32 recibe el modo en la respuesta de su próximo envío (hasta ~6 s)
+  // El ESP32 recibe el modo en la respuesta de su próximo envío (hasta ~5 s)
   async cambiarValvula(id_dispositivo: number, id_cliente: number, data: ValvulaDTO) {
     const actual = await this.obtenerPropio(id_dispositivo, id_cliente);
     const modo = data?.modo;

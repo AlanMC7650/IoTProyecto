@@ -26,13 +26,13 @@ const RANGOS: { id: Exclude<RangoId, "personalizado">; label: string; ms: number
   { id: "24h", label: "24 h", ms: 24 * 60 * 60 * 1000 },
 ];
 
-// El ESP32 mide cada 2 s pero manda su cola cada ~6 s, y un envío (o dos) puede
-// fallar: en línea si la última lectura tiene menos de 30 s
+// El ESP32 envía cada 5 s y un envío (o dos) puede fallar: en línea si la
+// última lectura tiene menos de 30 s
 const MS_EN_LINEA = 30_000;
 // Resumen y eventos se refrescan cada minuto (cada pedido pasa por ngrok)
 const REFRESCO_RESUMEN_MS = 60_000;
 // Segundos entre lecturas del ESP32, para sumar el tiempo con la válvula cerrada
-const SEGUNDOS_POR_LECTURA = 2;
+const SEGUNDOS_POR_LECTURA = 5;
 // El sensor de agua T1592 todavía no está instalado: su panel queda oculto.
 // Poner en true cuando se conecte.
 const MOSTRAR_SENSOR_AGUA = false;
@@ -57,11 +57,11 @@ function sumarLectura(r: ResumenCaudal, l: LecturaCaudal, pulsosPorLitro: number
   };
 }
 
-// Hasta 15 minutos se dibuja cada lectura (una cada 2 s). En rangos más
+// Hasta 30 minutos se dibuja cada lectura (una cada 5 s). En rangos más
 // largos el Back promedia por intervalos para no dibujar miles de puntos.
-const SIN_AGRUPAR_HASTA_MS = 15 * 60 * 1000;
-const MAX_PUNTOS = 450;
-const INTERVALOS_S = [5, 10, 30, 60, 120, 300, 600, 1800, 3600, 7200, 21600, 86400];
+const SIN_AGRUPAR_HASTA_MS = 30 * 60 * 1000;
+const MAX_PUNTOS = 400;
+const INTERVALOS_S = [10, 30, 60, 120, 300, 600, 1800, 3600, 7200, 21600, 86400];
 
 const TEXTO_EVENTO: Record<Evento["tipo"], string> = {
   FUGA: "Fuga",
