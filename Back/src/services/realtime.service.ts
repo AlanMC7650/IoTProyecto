@@ -10,19 +10,29 @@ import { opcionesConexion } from "../config/data-source";
 // (el plan gratuito permite 20 000 peticiones por mes).
 
 const CANAL = "nueva_lectura";
+// Canal propio para comprobar que la escucha sigue viva (ver revisarConexion)
+const CANAL_CONTROL = "aquacontrol_control";
 const REINTENTO_MS = 5000;
 const LATIDO_MS = 20_000;
+const REVISION_MS = 30_000;
+const ESPERA_CONTROL_MS = 10_000;
 
 const suscriptores = new Map<number, Set<Response>>();
 let cliente: Client | null = null;
+let controlPendiente: (() => void) | null = null;
 
 function enviar(res: Response, evento: string, datos: unknown) {
   res.write(`event: ${evento}\ndata: ${JSON.stringify(datos)}\n\n`);
 }
 
 async function conectar() {
-  const nuevo = new Client(opcionesConexion());
+  // keepAlive: el sistema operativo detecta antes una conexión muerta
+  const nuevo = new Client({ ...opcionesConexion(), keepAlive: true });
   nuevo.on("notification", (mensaje) => {
+    if (mensaje.channel === CANAL_CONTROL) {
+      controlPendiente?.();
+      return;
+    }
     if (mensaje.channel !== CANAL || !mensaje.payload) return;
     try {
       const datos = JSON.parse(mensaje.payload) as { id_dispositivo: number };
@@ -42,6 +52,7 @@ async function conectar() {
   try {
     await nuevo.connect();
     await nuevo.query(`LISTEN ${CANAL}`);
+    await nuevo.query(`LISTEN ${CANAL_CONTROL}`);
     cliente = nuevo;
     console.log("Escuchando lecturas en tiempo real (LISTEN nueva_lectura)");
   } catch (error) {
@@ -58,9 +69,39 @@ function reconectar(anterior: Client) {
   setTimeout(conectar, REINTENTO_MS);
 }
 
+// La red o el pooler de Supabase pueden cerrar la conexión de escucha sin
+// avisar: no hay evento de error, simplemente dejan de llegar los avisos y el
+// dashboard ya no se actualiza solo. Cada 30 s se manda un aviso a uno mismo
+// por un canal de control; si no vuelve en 10 s, se reconecta.
+async function revisarConexion() {
+  const actual = cliente;
+  if (!actual || controlPendiente) return;
+
+  const volvio = new Promise<boolean>((resolver) => {
+    const timer = setTimeout(() => resolver(false), ESPERA_CONTROL_MS);
+    controlPendiente = () => {
+      clearTimeout(timer);
+      resolver(true);
+    };
+  });
+
+  try {
+    await actual.query(`SELECT pg_notify('${CANAL_CONTROL}', '')`);
+  } catch {
+    // Si la consulta falla, la espera de abajo termina en false
+  }
+  const ok = await volvio;
+  controlPendiente = null;
+  if (!ok && cliente === actual) {
+    console.error("La escucha de lecturas en tiempo real dejó de responder: reconectando");
+    reconectar(actual);
+  }
+}
+
 export const RealtimeService = {
   iniciar() {
     void conectar();
+    setInterval(() => void revisarConexion(), REVISION_MS).unref();
     // Comentario SSE periódico: mantiene viva la conexión a través de ngrok y proxies
     setInterval(() => {
       for (const conjunto of suscriptores.values()) {
