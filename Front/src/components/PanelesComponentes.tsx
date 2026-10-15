@@ -158,12 +158,16 @@ export function PanelAgua({
 // --- Electroválvula --------------------------------------------------------
 
 export function PanelValvula({
-  ultima, enVivo, puntos, sinDatos, estado, resumen, onModo,
+  ultima, enVivo, puntos, sinDatos, estado, resumen, onModo, onConfirmarFuga,
 }: Comun & {
   estado: EstadoDispositivo | null;
   resumen: ResumenCaudal | null;
   onModo?: (modo: ModoValvula) => Promise<void>;
+  // Mientras haya una fuga sin confirmar, el servidor manda cerrar aunque se toque "Abrir".
+  // El botón está también acá porque el panel del sensor de agua puede estar oculto.
+  onConfirmarFuga?: () => Promise<void>;
 }) {
+  const fugasPendientes = estado?.fugas_pendientes ?? 0;
   // Lo que reportó el ESP32 en su última lectura; si no está en línea, lo que debería hacer
   const abierta = enVivo && ultima?.valvula_abierta !== null && ultima?.valvula_abierta !== undefined
     ? ultima.valvula_abierta
@@ -194,6 +198,12 @@ export function PanelValvula({
               </button>
             ))}
           </div>}
+          {fugasPendientes > 0 && onConfirmarFuga && (
+            <div className="alerta-fuga">
+              <span>Hay una fuga sin confirmar: la válvula no se abre hasta que la confirmes.</span>
+              <button type="button" onClick={onConfirmarFuga}>Ya revisé la fuga</button>
+            </div>
+          )}
         </div>
       </div>
       <p className="panel-detalle">

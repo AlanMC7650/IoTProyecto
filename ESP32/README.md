@@ -10,7 +10,7 @@ No hay que escribir el Wi-Fi ni ninguna clave por dispositivo: el Wi-Fi se confi
 |---|---|---|
 | YF-S201 | Rojo / Negro / Amarillo | 5V (VIN) / GND / GPIO 27 (con divisor 10 kΩ – 20 kΩ: la señal es de 5 V) |
 | Sensor de agua T1592 | S / + / − | GPIO 34 / GPIO 13 / GND |
-| Módulo relé | VCC / GND / IN | 5V / GND / GPIO 26 |
+| Módulo relé | VCC / GND / IN | 5V / GND / GPIO 26 (se activa con 0 V; para apagarlo el ESP32 deja el pin suelto) |
 | Electroválvula NC 220 VAC | bobina | contacto COM–NO del relé (fase) y neutro |
 | LED RGB cátodo común | R / G / B / COM | GPIO 25 / 33 / 32 (220 Ω cada uno) / GND |
 
@@ -61,4 +61,5 @@ Caudal 6.42 L/min · hoy 145.3 L · cola 0
 | `Anuncio rechazado: 401` | `SUPABASE_ANON_KEY` está mal copiada. |
 | `Figura vinculado pero no tengo token` | Se borró `token.json` (por ejemplo, al regrabar el ESP32): desvincularlo en el dashboard y volver a vincularlo. |
 | El caudal siempre da 0 | Revisar el cable amarillo, el divisor y GPIO 27. |
-| El relé hace lo contrario | Poner `RELE_ACTIVO_EN_ALTO = False` en `config.py`. |
+| El relé no se apaga al tocar "Cerrar" (queda con las dos luces prendidas) | El módulo se activa con 0 V y los 3,3 V del ESP32 no alcanzan para apagarlo. Con `RELE_ACTIVO_EN_ALTO = False` (el valor por defecto) el ESP32 deja el pin suelto para apagarlo. Revisá que el `config.py` de la placa no diga `True`. |
+| El relé hace lo contrario | Es un módulo que se activa con señal alta: poner `RELE_ACTIVO_EN_ALTO = True` en `config.py`. |

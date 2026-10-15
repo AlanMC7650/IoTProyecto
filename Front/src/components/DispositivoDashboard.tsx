@@ -394,7 +394,11 @@ export function DispositivoDashboard({ dispositivo, onActualizado, onDesvinculad
         {MOSTRAR_SENSOR_AGUA && (
           <PanelAgua {...comun} estado={estado} onConfirmarFuga={soloLectura ? undefined : onConfirmarFuga} />
         )}
-        <PanelValvula {...comun} estado={estado} resumen={resumen} onModo={soloLectura ? undefined : onModo} />
+        <PanelValvula
+          {...comun} estado={estado} resumen={resumen}
+          onModo={soloLectura ? undefined : onModo}
+          onConfirmarFuga={soloLectura ? undefined : onConfirmarFuga}
+        />
         <PanelLed {...comun} />
       </div>
 

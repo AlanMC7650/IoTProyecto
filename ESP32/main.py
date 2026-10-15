@@ -59,7 +59,10 @@ MAX_COLA = 120               # ~10 minutos sin conexión
 MAX_LOTE = 20
 ESPERA_WIFI_SIN_VINCULAR_S = 30   # sin vincular y sin conectar: vuelve al portal
 SEGUNDOS_SECO_SIN_SERVIDOR = 30   # sin vincular, la fuga se libera sola al secarse
-RELE_ACTIVO_EN_ALTO = getattr(config, "RELE_ACTIVO_EN_ALTO", True)
+# La mayoría de los módulos relé de 5 V (como el del proyecto) se activan con 0 V
+# en IN. Poner RELE_ACTIVO_EN_ALTO = True en config.py solo si el módulo se
+# activa con señal alta (3,3 V).
+RELE_ACTIVO_EN_ALTO = getattr(config, "RELE_ACTIVO_EN_ALTO", False)
 
 URL_RPC = config.SUPABASE_URL.rstrip("/") + "/rest/v1/rpc/"
 CABECERAS = {"apikey": config.SUPABASE_ANON_KEY, "Content-Type": "application/json"}
@@ -135,7 +138,7 @@ def contar_pulso(pin):
 sensor_flujo = Pin(PIN_FLUJO, Pin.IN, Pin.PULL_UP)
 sensor_flujo.irq(trigger=Pin.IRQ_FALLING, handler=contar_pulso)
 
-rele = Pin(PIN_RELE, Pin.OUT)
+rele = Pin(PIN_RELE, Pin.IN, None)   # arranca suelto: relé apagado y válvula cerrada
 agua_alim = Pin(PIN_AGUA_ALIM, Pin.OUT, value=0)
 agua_adc = ADC(Pin(PIN_AGUA_SENAL))
 agua_adc.atten(ADC.ATTN_11DB)
@@ -144,7 +147,16 @@ boton = Pin(PIN_BOOT, Pin.IN, Pin.PULL_UP)
 
 def mover_valvula(abrir):
     # Electroválvula NC: relé activado = válvula abierta
-    rele.value(1 if abrir == RELE_ACTIVO_EN_ALTO else 0)
+    if RELE_ACTIVO_EN_ALTO:
+        rele.init(Pin.OUT, value=1 if abrir else 0)
+    elif abrir:
+        # Módulo que se activa con 0 V: para prenderlo, el pin va a 0 V
+        rele.init(Pin.OUT, value=0)
+    else:
+        # ...y para apagarlo el pin queda suelto (entrada, sin resistencia interna).
+        # Con 3,3 V los módulos de 5 V no se apagan: la entrada IN necesita casi 5 V
+        # o quedar desconectada, y un pin suelto equivale a desconectado.
+        rele.init(Pin.IN, None)
 
 
 def leer_nivel_agua():
