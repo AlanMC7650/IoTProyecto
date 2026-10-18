@@ -62,6 +62,19 @@ Todavía sin commitear. Detalle en [FASE2.md](FASE2.md).
 - **Velocidad:** se probó medir cada 2 s y enviar en tandas cada ~6 s (ver [ARREGLO_TIEMPO_REAL.md](ARREGLO_TIEMPO_REAL.md)), pero por el costo de abrir una conexión HTTPS en cada envío el dashboard quedaba más lento; se volvió a una lectura cada 5 s. El estado "en línea" se actualiza cada segundo y tolera 30 s sin datos. Para no llenar Supabase, la BD borra sola las lecturas de más de 30 días.
 - **Superadmin:** puede abrir los dashboards de cualquier usuario desde "Ver dashboards" en `/admin`, verlos en tiempo real y exportarlos a CSV. Es solo lectura: no puede mover válvulas ni cambiar configuraciones ajenas.
 
+## 6b. Tercera fase: app móvil (rama `feat/movil`)
+
+App para Android en **Flutter**, en [Movil/aquacontrol_app](../Movil/aquacontrol_app). Detalle en su [README](../Movil/aquacontrol_app/README.md).
+
+- **Qué incluye:** lo mismo que el dashboard:
+  - inicio de sesión, registro y sesión guardada en el teléfono;
+  - lista de dispositivos y vinculación por código;
+  - pantalla del dispositivo con caudal y gráfica en tiempo real (SSE), consumo de hoy y límite diario;
+  - electroválvula (Abrir / Cerrar / Auto, con el aviso de fuga sin confirmar);
+  - LED como gemelo digital y eventos.
+- **No cambia el Back:** usa la misma API por ngrok. La dirección del servidor se puede cambiar desde la pantalla de inicio de sesión.
+- **Probado:** en Chrome (versión web de la misma app) contra el Back y el simulador; al tocar Cerrar, la válvula del simulador cerró y el caudal cayó a 0 en vivo. El APK se compila (`flutter build apk --release`), pero **no se instaló en un celular real**.
+
 ## 7. Qué se probó y qué no
 
 **Probado:**

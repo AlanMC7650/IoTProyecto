@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "Back", "run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "aquacontrol-movil-web",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8085", "--directory", "Movil/aquacontrol_app/build/web"],
+      "port": 8085
     }
   ]
 }
