@@ -9,9 +9,10 @@
 #   2. Se anuncia en Supabase con su MAC y muestra su código (LED azul parpadeando).
 #   3. El usuario escribe ese código en el dashboard; el ESP32 recibe su token y
 #      lo guarda en token.json.
-#   4. Cada 5 s arma una lectura y la manda a Supabase (si no hay conexión queda
-#      en una cola y se envía al volver) y aplica la orden de la válvula que viene
-#      en la respuesta (la orden del dashboard tarda hasta ~5 s en llegar).
+#   4. Cada 5 s arma una lectura y la manda a Supabase apenas se mide, por una
+#      conexión HTTPS que queda abierta (cliente_http.py); si no hay conexión
+#      queda en una cola y se envía al volver. Aplica la orden de la válvula que
+#      viene en la respuesta (la orden del dashboard tarda hasta ~5 s en llegar).
 # La fuga y el límite diario se resuelven acá mismo, aunque no haya Internet.
 # Mantener presionado el botón BOOT 5 s borra el Wi-Fi y la vinculación.
 
@@ -23,17 +24,13 @@ import math
 import gc
 
 try:
-    import urequests as requests
-except ImportError:
-    import requests
-
-try:
     import ujson as json
 except ImportError:
     import json
 
 import config
 import portal
+from cliente_http import ClienteHTTP
 
 # --- Pines -------------------------------------------------------------------
 PIN_FLUJO = 27
@@ -50,11 +47,15 @@ UMBRAL_FUGA = 1500           # 0-4095: agua en el piso
 UMBRAL_SECO = 800
 CAUDAL_MEDIO = 4.0           # L/min: verde -> amarillo
 CAUDAL_ALTO = 8.0            # L/min: rojo
-# Una lectura por envío, cada 5 s. Cada envío abre una conexión HTTPS nueva que
-# bloquea de 3 a 5 s: intervalos más cortos no hacen que lleguen más rápido.
-# Los dos valores van iguales para que cada lectura salga apenas se arma.
+# La conexión HTTPS con Supabase queda abierta (keep-alive) y cada envío tarda
+# lo que la ida y vuelta (~0,1-0,5 s), no los 3-5 s de abrir una conexión nueva.
+# Por eso la cola se revisa cada segundo: cada lectura sale apenas se arma.
+# INTERVALO_LECTURA_S sigue en 5 porque el Back y el Front cuentan con eso
+# (SEGUNDOS_POR_LECTURA).
 INTERVALO_LECTURA_S = 5      # cada cuánto se arma una lectura y se agrega a la cola
-INTERVALO_ENVIO_S = 5        # cada cuánto se manda la cola a Supabase
+INTERVALO_ENVIO_S = 1        # cada cuánto se revisa la cola y se manda lo que haya
+ESPERA_TRAS_ERROR_S = 5      # después de un error de red, para no bloquear en cada vuelta
+INTERVALO_ANUNCIO_S = 5      # sin vincular: cada cuánto pregunta si ya lo vincularon
 MAX_COLA = 120               # ~10 minutos sin conexión
 MAX_LOTE = 20
 ESPERA_WIFI_SIN_VINCULAR_S = 30   # sin vincular y sin conectar: vuelve al portal
@@ -64,8 +65,9 @@ SEGUNDOS_SECO_SIN_SERVIDOR = 30   # sin vincular, la fuga se libera sola al seca
 # activa con señal alta (3,3 V).
 RELE_ACTIVO_EN_ALTO = getattr(config, "RELE_ACTIVO_EN_ALTO", False)
 
-URL_RPC = config.SUPABASE_URL.rstrip("/") + "/rest/v1/rpc/"
 CABECERAS = {"apikey": config.SUPABASE_ANON_KEY, "Content-Type": "application/json"}
+# El socket TLS queda abierto entre envíos y se reabre solo si el servidor lo cierra
+supabase = ClienteHTTP(config.SUPABASE_URL.rstrip("/") + "/rest/v1/rpc", CABECERAS, timeout=10)
 ARCHIVO_TOKEN = "token.json"
 
 sta = network.WLAN(network.STA_IF)
@@ -173,24 +175,11 @@ mover_valvula(False)   # empieza cerrada hasta evaluar el estado
 
 # --- Comunicación con Supabase -------------------------------------------------
 def rpc(funcion, cuerpo):
-    """Devuelve (codigo_http, datos). Lanza OSError si no hay conexión."""
-    gc.collect()   # una conexión HTTPS usa unos 40 KB de RAM
-    r = None
+    """Devuelve (codigo_http, datos). Lanza OSError si no hay conexión.
+    Reusa la conexión abierta; si se cortó, la reabre (unos 3-5 s esa vez)."""
     try:
-        try:
-            r = requests.post(URL_RPC + funcion, data=json.dumps(cuerpo),
-                              headers=CABECERAS, timeout=10)
-        except TypeError:
-            # Versiones viejas de urequests no aceptan timeout
-            r = requests.post(URL_RPC + funcion, data=json.dumps(cuerpo), headers=CABECERAS)
-        try:
-            datos = r.json()
-        except ValueError:
-            datos = None
-        return r.status_code, datos
+        return supabase.post_json("/" + funcion, cuerpo)
     finally:
-        if r is not None:
-            r.close()
         gc.collect()
 
 
@@ -260,6 +249,8 @@ boton_desde = None
 t_segundo = time.ticks_ms()
 t_lectura = t_segundo
 t_envio = t_segundo
+t_anuncio = time.ticks_add(t_segundo, -INTERVALO_ANUNCIO_S * 1000)
+espera_envio_ms = INTERVALO_ENVIO_S * 1000
 fase = 0
 wdt = WDT(timeout=30000)    # reinicia el ESP32 si el programa se cuelga
 
@@ -348,9 +339,11 @@ while True:
         pulsos_intervalo = 0
         nivel_intervalo = 0
 
-    # --- Envío, cada INTERVALO_ENVIO_S: la cola entera en un solo POST ---
-    if time.ticks_diff(ahora, t_envio) >= INTERVALO_ENVIO_S * 1000:
+    # --- Envío: cada INTERVALO_ENVIO_S se manda lo que haya en la cola ---
+    # Va después de la lectura, así una lectura nueva sale en esta misma vuelta.
+    if time.ticks_diff(ahora, t_envio) >= espera_envio_ms:
         t_envio = ahora
+        espera_envio_ms = INTERVALO_ENVIO_S * 1000
 
         if not sta.isconnected():
             if not token and time.ticks_diff(ahora, inicio) > ESPERA_WIFI_SIN_VINCULAR_S * 1000:
@@ -365,16 +358,20 @@ while True:
                     sta.connect(wifi["ssid"], wifi.get("clave", ""))
                 except OSError as e:
                     print("Error de Wi-Fi:", e)
+            supabase.cerrar()   # sin Wi-Fi el socket ya no sirve: se reabre al volver
         else:
             try:
                 if not token:
-                    anunciar()
-                else:
+                    if time.ticks_diff(ahora, t_anuncio) >= INTERVALO_ANUNCIO_S * 1000:
+                        t_anuncio = ahora
+                        anunciar()
+                elif cola:
                     for _ in range(3):   # se pone al día de a poco después de un corte
                         if not cola:
                             break
                         respuesta = enviar_cola()
                         if respuesta is None:
+                            espera_envio_ms = ESPERA_TRAS_ERROR_S * 1000   # rechazado: no insistir cada segundo
                             break
                         consumo_servidor = float(respuesta.get("consumo_hoy_l") or 0)
                         litros_desde_respuesta = 0.0
@@ -391,7 +388,9 @@ while True:
                             print("Orden del servidor: válvula", nueva, "-", respuesta.get("motivo"))
                     print("Caudal", round(caudal, 2), "L/min · hoy", consumo_servidor, "L · cola", len(cola))
             except Exception as e:
-                print("Sin conexión con Supabase, se reintenta:", e)
+                supabase.cerrar()
+                espera_envio_ms = ESPERA_TRAS_ERROR_S * 1000
+                print("Sin conexión con Supabase, se reintenta en", ESPERA_TRAS_ERROR_S, "s:", e)
 
     # --- LED RGB (cada 20 ms, para que los cambios sean graduales) ---
     if not token:

@@ -1,4 +1,5 @@
 import "reflect-metadata";
+import path from "path";
 import { DataSource } from "typeorm";
 import * as dotenv from "dotenv";
 
@@ -32,6 +33,8 @@ export const AppDataSource = new DataSource({
   // Con el ESP32 enviando y la web consultando cada pocos segundos, loguear
   // cada query tapa la consola: se activa solo con DB_LOGGING=true
   logging: process.env.DB_LOGGING === "true" ? true : ["error"],
-  entities: ["src/entities/**/*.ts"],
-  migrations: ["src/migrations/**/*.ts"],
+  // Rutas relativas a este archivo: sirven tanto con ts-node (src/*.ts) como
+  // compilado con tsc (dist/*.js, que es lo que corre en Docker)
+  entities: [path.join(__dirname, "..", "entities", "**", "*.{ts,js}")],
+  migrations: [path.join(__dirname, "..", "migrations", "**", "*.{ts,js}")],
 });

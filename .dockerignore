@@ -1,0 +1,12 @@
+**/node_modules
+**/dist
+**/.env
+**/*.log
+.git
+Back/public
+Movil
+ESP32
+Fase2
+capturas
+docs
+*.zip
